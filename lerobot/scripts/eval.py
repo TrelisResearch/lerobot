@@ -51,6 +51,7 @@ from datetime import datetime as dt
 from pathlib import Path
 from typing import Callable
 
+import cv2
 import einops
 import gymnasium as gym
 import numpy as np
@@ -233,6 +234,18 @@ def eval_policy(
     start = time.time()
     policy.eval()
 
+    keypoints = None
+    vis_size = env.call("visualization_width")[0]
+
+    def hook(module, input, output):
+        nonlocal keypoints
+        # Reshape to (batch, seq, num_keypoints, 2)
+        output = output.reshape(env.num_envs, -1, output.shape[-2], output.shape[-1])
+        # Select the last set of keypoints in the sequence.
+        keypoints = (output[:, -1] / 2 + 0.5) * vis_size
+
+    hook_handle = policy.diffusion.rgb_encoder.pool.register_forward_hook(hook)
+
     # Determine how many batched rollouts we need to get n_episodes. Note that if n_episodes is not evenly
     # divisible by env.num_envs we end up discarding some data in the last batch.
     n_batches = n_episodes // env.num_envs + int((n_episodes % env.num_envs) != 0)
@@ -256,6 +269,16 @@ def eval_policy(
         elif isinstance(env, gym.vector.AsyncVectorEnv):
             # Here we must render all frames and discard any we don't need.
             ep_frames.append(np.stack(env.call("render")[:n_to_render_now]))
+
+        if keypoints is not None:
+            for batch_ix in range(env.num_envs):
+                if len(ep_frames[-1]) <= batch_ix:
+                    continue
+                for kp in keypoints[batch_ix].cpu().numpy():
+                    kp = np.round(kp).astype(int)
+                    ep_frames[-1][batch_ix] = cv2.circle(
+                        ep_frames[-1][batch_ix], (kp[0], kp[1]), radius=3, color=(255, 0, 255), thickness=-1
+                    )
 
     if max_episodes_rendered > 0:
         video_paths: list[str] = []
@@ -403,6 +426,8 @@ def eval_policy(
 
     if max_episodes_rendered > 0:
         info["video_paths"] = video_paths
+
+    hook_handle.remove()
 
     return info
 
