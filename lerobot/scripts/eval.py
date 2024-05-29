@@ -76,6 +76,14 @@ from lerobot.common.utils.io_utils import write_video
 from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config, init_logging, set_global_seed
 
 
+def _split_obs(observation):
+    observation["observation.images.top_left"] = observation["observation.image"][..., :50, :50]
+    observation["observation.images.top_right"] = observation["observation.image"][..., :50, -50:]
+    observation["observation.images.bottom_left"] = observation["observation.image"][..., -50:, :50]
+    observation["observation.images.bottom_right"] = observation["observation.image"][..., -50:, -50:]
+    del observation["observation.image"]
+
+
 def rollout(
     env: gym.vector.VectorEnv,
     policy: Policy,
@@ -99,7 +107,7 @@ def rollout(
         "reward": A (batch, sequence) tensor of rewards received for applying the actions.
         "success": A (batch, sequence) tensor of success conditions (the only time this can be True is upon
             environment termination/truncation).
-        "don": A (batch, sequence) tensor of **cumulative** done conditions. For any given batch element,
+        "done": A (batch, sequence) tensor of **cumulative** done conditions. For any given batch element,
             the first True is followed by True's all the way till the end. This can be used for masking
             extraneous elements from the sequences above.
 
@@ -144,6 +152,7 @@ def rollout(
     while not np.all(done):
         # Numpy array to tensor and changing dictionary keys to LeRobot policy format.
         observation = preprocess_observation(observation)
+        _split_obs(observation)
         if return_observations:
             all_observations.append(deepcopy(observation))
 
@@ -186,6 +195,7 @@ def rollout(
     # Track the final observation.
     if return_observations:
         observation = preprocess_observation(observation)
+        _split_obs(observation)
         all_observations.append(deepcopy(observation))
 
     # Stack the sequence along the first dimension so that we have (batch, sequence, *) tensors.

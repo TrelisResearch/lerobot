@@ -31,6 +31,13 @@ from lerobot.common.datasets.utils import (
 )
 from lerobot.common.datasets.video_utils import VideoFrame, encode_video_frames
 
+image_keys = [
+    "observation.images.top_left",
+    "observation.images.top_right",
+    "observation.images.bottom_left",
+    "observation.images.bottom_right",
+]
+
 
 def check_format(raw_dir):
     zarr_path = raw_dir / "pusht_cchi_v7_replay.zarr"
@@ -139,25 +146,35 @@ def load_from_raw(raw_dir, out_dir, fps, video, debug):
 
         ep_dict = {}
 
-        imgs_array = [x.numpy() for x in image]
-        img_key = "observation.image"
-        if video:
-            # save png images in temporary directory
-            tmp_imgs_dir = out_dir / "tmp_images"
-            save_images_concurrently(imgs_array, tmp_imgs_dir)
+        for img_key in image_keys:
+            if img_key.endswith("top_left"):
+                imgs_array = [x[:50, :50].numpy() for x in image]
+            elif img_key.endswith("top_right"):
+                imgs_array = [x[:50, -50:].numpy() for x in image]
+            elif img_key.endswith("bottom_left"):
+                imgs_array = [x[-50:, :50].numpy() for x in image]
+            elif img_key.endswith("bottom_right"):
+                imgs_array = [x[-50:, -50:].numpy() for x in image]
 
-            # encode images to a mp4 video
-            fname = f"{img_key}_episode_{ep_idx:06d}.mp4"
-            video_path = out_dir / "videos" / fname
-            encode_video_frames(tmp_imgs_dir, video_path, fps)
+            if video:
+                # save png images in temporary directory
+                tmp_imgs_dir = out_dir / "tmp_images"
+                save_images_concurrently(imgs_array, tmp_imgs_dir)
 
-            # clean temporary images directory
-            shutil.rmtree(tmp_imgs_dir)
+                # encode images to a mp4 video
+                fname = f"{img_key}_episode_{ep_idx:06d}.mp4"
+                video_path = out_dir / "videos" / fname
+                encode_video_frames(tmp_imgs_dir, video_path, fps)
 
-            # store the reference to the video frame
-            ep_dict[img_key] = [{"path": f"videos/{fname}", "timestamp": i / fps} for i in range(num_frames)]
-        else:
-            ep_dict[img_key] = [PILImage.fromarray(x) for x in imgs_array]
+                # clean temporary images directory
+                shutil.rmtree(tmp_imgs_dir)
+
+                # store the reference to the video frame
+                ep_dict[img_key] = [
+                    {"path": f"videos/{fname}", "timestamp": i / fps} for i in range(num_frames)
+                ]
+            else:
+                ep_dict[img_key] = [PILImage.fromarray(x) for x in imgs_array]
 
         ep_dict["observation.state"] = agent_pos
         ep_dict["action"] = actions[id_from:id_to]
@@ -189,9 +206,11 @@ def to_hf_dataset(data_dict, video):
     features = {}
 
     if video:
-        features["observation.image"] = VideoFrame()
+        for k in image_keys:
+            features[k] = VideoFrame()
     else:
-        features["observation.image"] = Image()
+        for k in image_keys:
+            features[k] = Image()
 
     features["observation.state"] = Sequence(
         length=data_dict["observation.state"].shape[1], feature=Value(dtype="float32", id=None)
