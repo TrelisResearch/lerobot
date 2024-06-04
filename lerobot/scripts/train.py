@@ -74,14 +74,16 @@ def make_optimizer_and_scheduler(cfg, policy):
             cfg.training.adam_eps,
             cfg.training.adam_weight_decay,
         )
-        from diffusers.optimization import get_scheduler
 
-        lr_scheduler = get_scheduler(
-            cfg.training.lr_scheduler,
-            optimizer=optimizer,
-            num_warmup_steps=cfg.training.lr_warmup_steps,
-            num_training_steps=cfg.training.offline_steps,
-        )
+        lr_scheduler = None
+        if cfg.training.lr_scheduler is not None:
+            from diffusers.optimization import get_scheduler
+            lr_scheduler = get_scheduler(
+                cfg.training.lr_scheduler,
+                optimizer=optimizer,
+                num_warmup_steps=cfg.training.lr_warmup_steps,
+                num_training_steps=cfg.training.offline_steps,
+            )
     elif policy.name == "tdmpc":
         optimizer = torch.optim.Adam(policy.parameters(), cfg.training.lr)
         lr_scheduler = None
