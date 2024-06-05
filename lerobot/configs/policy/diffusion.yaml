@@ -81,6 +81,7 @@ policy:
   crop_is_random: True
   pretrained_backbone_weights: null
   use_group_norm: True
+  global_pool_dim_out: null
   spatial_softmax_num_keypoints: 32
   # Unet.
   down_dims: [512, 1024, 2048]

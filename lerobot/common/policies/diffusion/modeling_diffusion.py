@@ -437,9 +437,23 @@ class DiffusionRgbEncoder(nn.Module):
         with torch.inference_mode():
             dummy_feature_map = self.backbone(dummy_input)
         feature_map_shape = tuple(dummy_feature_map.shape[1:])
-        self.pool = SpatialSoftmax(feature_map_shape, num_kp=config.spatial_softmax_num_keypoints)
-        self.feature_dim = config.spatial_softmax_num_keypoints * 2
-        self.out = nn.Linear(config.spatial_softmax_num_keypoints * 2, self.feature_dim)
+
+        if config.spatial_softmax_num_keypoints is not None:
+            self.pool = SpatialSoftmax(feature_map_shape, num_kp=config.spatial_softmax_num_keypoints)
+            self.feature_dim = config.spatial_softmax_num_keypoints * 2
+        elif config.global_pool_dim_out is not None:
+            self.pool = nn.Sequential(
+                nn.Conv2d(feature_map_shape[0], config.global_pool_dim_out, kernel_size=(1, 1)),
+                nn.AdaptiveAvgPool2d((1, 1)),
+            )
+            self.feature_dim = config.global_pool_dim_out
+        else:
+            raise AssertionError(
+                "Both `spatial_softmax_num_keypoints` and `global_pool_dim_out` are not defined. This "
+                "should have been caught in the config class."
+            )
+
+        self.out = nn.Linear(self.feature_dim, self.feature_dim)
         self.relu = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
