@@ -30,8 +30,8 @@ from lerobot.common.policies.factory import get_policy_and_config_classes, make_
 from lerobot.common.policies.normalize import Normalize, Unnormalize
 from lerobot.common.policies.policy_protocol import Policy
 from lerobot.common.utils.utils import init_hydra_config
-from tests.scripts.save_policy_to_safetensor import get_policy_stats
-from tests.utils import DEFAULT_CONFIG_PATH, DEVICE, require_env, require_x86_64_kernel
+from tests.scripts.save_policy_to_safetensors import get_policy_stats
+from tests.utils import DEFAULT_CONFIG_PATH, DEVICE, require_cpu, require_env, require_x86_64_kernel
 
 
 @pytest.mark.parametrize("policy_name", available_policies)
@@ -72,6 +72,8 @@ def test_get_policy_and_config_classes(policy_name: str):
         ),
         # Note: these parameters also need custom logic in the test function for overriding the Hydra config.
         ("pusht", "act", ["env.task=PushT-v0", "dataset_repo_id=lerobot/pusht"]),
+        ("dora_aloha_real", "act_real", []),
+        ("dora_aloha_real", "act_real_no_state", []),
     ],
 )
 @require_env
@@ -84,6 +86,9 @@ def test_policy(env_name, policy_name, extra_overrides):
         - Updating the policy.
         - Using the policy to select actions at inference time.
         - Test the action can be applied to the policy
+
+    Note: We test various combinations of policy and dataset. The combinations are by no means exhaustive,
+          and for now we add tests as we see fit.
     """
     cfg = init_hydra_config(
         DEFAULT_CONFIG_PATH,
@@ -135,7 +140,7 @@ def test_policy(env_name, policy_name, extra_overrides):
 
     dataloader = torch.utils.data.DataLoader(
         dataset,
-        num_workers=4,
+        num_workers=0,
         batch_size=2,
         shuffle=True,
         pin_memory=DEVICE != "cpu",
@@ -291,21 +296,24 @@ def test_normalize(insert_temporal_dim):
             ["policy.n_action_steps=8", "policy.num_inference_steps=10", "policy.down_dims=[128, 256, 512]"],
         ),
         ("aloha", "act", ["policy.n_action_steps=10"]),
+        ("dora_aloha_real", "act_real", ["policy.n_action_steps=10"]),
+        ("dora_aloha_real", "act_real_no_state", ["policy.n_action_steps=10"]),
     ],
 )
 # As artifacts have been generated on an x86_64 kernel, this test won't
 # pass if it's run on another platform due to floating point errors
 @require_x86_64_kernel
+@require_cpu
 def test_backward_compatibility(env_name, policy_name, extra_overrides):
     """
     NOTE: If this test does not pass, and you have intentionally changed something in the policy:
         1. Inspect the differences in policy outputs and make sure you can account for them. Your PR should
            include a report on what changed and how that affected the outputs.
-        2. Go to the `if __name__ == "__main__"` block of `test/scripts/save_policy_to_safetensors.py` and
+        2. Go to the `if __name__ == "__main__"` block of `tests/scripts/save_policy_to_safetensors.py` and
            add the policies you want to update the test artifacts for.
-        3. Run `python test/scripts/save_policy_to_safetensors.py`. The test artifact should be updated.
+        3. Run `python tests/scripts/save_policy_to_safetensors.py`. The test artifact should be updated.
         4. Check that this test now passes.
-        5. Remember to restore `test/scripts/save_policy_to_safetensors.py` to its original state.
+        5. Remember to restore `tests/scripts/save_policy_to_safetensors.py` to its original state.
         6. Remember to stage and commit the resulting changes to `tests/data`.
     """
     env_policy_dir = Path("tests/data/save_policy_to_safetensors") / f"{env_name}_{policy_name}"
