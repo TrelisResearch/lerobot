@@ -84,7 +84,6 @@ def rollout(
     return_observations: bool = False,
     render_callback: Callable[[gym.vector.VectorEnv], None] | None = None,
     do_simulate_latency: bool = False,
-    n_action_buffer: int = 0,
     enable_progbar: bool = False,
 ) -> dict:
     """Run a batched policy rollout once through a batch of environments.
@@ -119,15 +118,13 @@ def rollout(
             choose to simulate a specific setting where the observation and action happen on the same clock,
             cycle. Therefore, any action chosen on the basis of an action needs to wait till at least the
             next clock cycle.
-        n_action_buffer: Controls pre-emptive inference which is useful for rolling out in real-time (or
-            when simulating latency). See PolicyRolloutWrapper for more details.
         enable_progbar: Enable a progress bar over rollout steps.
     Returns:
         The dictionary described above.
     """
     assert isinstance(policy, nn.Module), "Policy must be a PyTorch nn module."
     fps = env.unwrapped.metadata["render_fps"]
-    policy_rollout_wrapper = PolicyRolloutWrapper(policy, fps=fps, n_action_buffer=n_action_buffer)
+    policy_rollout_wrapper = PolicyRolloutWrapper(policy, fps=fps)
 
     # Reset the policy and environments.
     policy_rollout_wrapper.reset()
@@ -176,7 +173,6 @@ def rollout(
                 observation_timestamp=step / fps,
                 first_action_timestamp=step / fps,
                 strict_observation_timestamps=step > 0,
-                timeout=None if step == 0 or not do_simulate_latency else base_timeout - timeout_margin,
             )
             if action_sequence is not None:
                 action_sequence = action_sequence.numpy()
@@ -274,7 +270,6 @@ def eval_policy(
     return_episode_data: bool = False,
     start_seed: int | None = None,
     do_simulate_latency: bool = False,
-    n_action_buffer: int = 0,
     enable_progbar: bool = False,
     enable_inner_progbar: bool = False,
 ) -> dict:
@@ -291,8 +286,6 @@ def eval_policy(
             seed is incremented by 1. If not provided, the environments are not manually seeded.
         do_simulate_latency: Whether to simulate latency between observation and action execution. See inline
             documentation in `rollout` for more details.
-        n_action_buffer: Controls pre-emptive inference which is useful for rolling out in real-time (or
-            when simulating latency). See PolicyRolloutWrapper for more details.
         enable_progbar: Enable progress bar over batches.
         enable_inner_progbar: Enable progress bar over steps in each batch.
     Returns:
@@ -383,7 +376,6 @@ def eval_policy(
             return_observations=return_episode_data,
             render_callback=render_frame if max_episodes_rendered > 0 else None,
             do_simulate_latency=do_simulate_latency,
-            n_action_buffer=n_action_buffer,
             enable_progbar=enable_inner_progbar,
         )
 
@@ -661,7 +653,6 @@ def main(
             videos_dir=Path(out_dir) / "videos",
             start_seed=hydra_cfg.seed,
             do_simulate_latency=hydra_cfg.eval.do_simulate_latency,
-            n_action_buffer=hydra_cfg.eval.n_action_buffer,
             enable_progbar=True,
             enable_inner_progbar=True,
         )
