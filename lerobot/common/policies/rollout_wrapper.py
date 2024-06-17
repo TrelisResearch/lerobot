@@ -9,6 +9,8 @@ from lerobot.common.policies.utils import get_device_from_parameters
 
 
 class PolicyRolloutWrapper:
+    """See docs from more complex version."""
+
     def __init__(self, policy: Policy, fps: float):
         """
         Args:
@@ -128,31 +130,6 @@ class PolicyRolloutWrapper:
         first_action_timestamp: float,
         strict_observation_timestamps: bool = False,
     ) -> Tensor | None:
-        """Provide an observation and get an action sequence back.
-
-        This method does several things:
-        1. Accepts an observation with a timestamp. This is added to the observation cache.
-        2. Runs inference either synchronously or asynchronously.
-        3. Returns a sequence of actions starting from the requested timestamp (from a cache which is
-           populated by inference outputs).
-
-        All time related arguments are to be provided in units of seconds, relative to an arbitrary reference
-        point which is fixed throughout the duration of the rollout.
-
-        Args:
-            observation_batch: Mapping of observation type key to observation batch tensor for a single time
-                step.
-            observation_timestamp: The timestamp associated with observation_batch. It should be as faithful
-                as possible to the time at which the observation was captured.
-            first_action_timestamp: The timestamp of the first action in the requested action sequence.
-            strict_observation_timestamps: Whether to raise a RuntimeError if there are no observations in the
-                cache with the timestamps needed to construct the inference inputs (ie there are no
-                observations within `self.timestamp_tolerance_ms`).
-        Returns:
-            A (sequence, batch, action_dime) tensor for a sequence of actions starting from the requested
-            `first_action_timestamp` and spaced by `1/fps` or None if the `timeout` is reached and there is no
-            first action available.
-        """
         # Immediately convert timestamps to integer milliseconds (so that hashing them for the cache keys
         # isn't susceptible to floating point issues).
         observation_timestamp_ms = int(round(observation_timestamp * 1000))
