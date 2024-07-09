@@ -262,6 +262,9 @@ class ACT(nn.Module):
         # Final action regression head on the output of the transformer's decoder.
         self.action_head = nn.Linear(config.dim_model, config.output_shapes["action"][0])
 
+        # Some useful buffers that we want to avoid creating in the forward pass.
+        self.register_buffer("zero_latent", torch.zeros([1, config.latent_dim], dtype=torch.float32))
+
         self._reset_parameters()
 
     def _reset_parameters(self):
@@ -342,10 +345,10 @@ class ACT(nn.Module):
         else:
             # When not using the VAE encoder, we set the latent to be all zeros.
             mu = log_sigma_x2 = None
-            # TODO(rcadene, alexander-soare): remove call to `.to` to speedup forward ; precompute and use buffer
-            latent_sample = torch.zeros([batch_size, self.config.latent_dim], dtype=torch.float32).to(
-                batch["observation.state"].device
-            )
+            # latent_sample = torch.zeros([batch_size, self.config.latent_dim], dtype=torch.float32).to(
+            #     batch["observation.state"].device
+            # )
+            latent_sample = einops.repeat(self.zero_latent, "1 d -> b d", b=batch_size)
 
         # Prepare all other transformer encoder inputs.
         # Camera observation features and positional embeddings.
