@@ -16,8 +16,10 @@
 import logging
 import os.path as osp
 import random
+import time
 from contextlib import contextmanager
 from datetime import datetime
+from itertools import count
 from pathlib import Path
 from typing import Any, Generator
 
@@ -172,3 +174,82 @@ def print_cuda_memory_usage():
     print("Maximum GPU Memory Allocated: {:.2f} MB".format(torch.cuda.max_memory_allocated(0) / 1024**2))
     print("Current GPU Memory Reserved: {:.2f} MB".format(torch.cuda.memory_reserved(0) / 1024**2))
     print("Maximum GPU Memory Reserved: {:.2f} MB".format(torch.cuda.max_memory_reserved(0) / 1024**2))
+
+
+class Timer:
+    """Timer with a context manager that allows you to accrue timing statistics.
+
+    Use like:
+
+    ```
+    with Timer.time("description"):
+        foo()
+
+    print(Timer.render_timing_statistics)
+    ```
+
+    A convenient feature is that timing statistics accrue for a given description. For example, this will
+    end up computing statistics for 100 calls to `foo`.
+
+    ```
+    for _ in range(100):
+        with Timer.time("description"):
+            foo()
+    ```
+
+    Note that the timing statistics are stored in a class attribute meaning that this class is NOT thread
+    safe.
+    """
+
+    # Store timing results as:
+    # {
+    #     "description1": {HEADER: value, ANOTHER_HEADER: another value, ...},
+    #     "description2": {HEADER: value, ANOTHER_HEADER: another value, ...},
+    #     ....
+    # }
+    timing_statistics: dict[str, dict[str, int | float]] = {}
+    _timing_session_id_iterator = count()
+
+    AVG_TIME_HEADER = "Avg. time (s)"
+    PROCESS_HEADER = "Routine"
+    TOTAL_TIME_HEADER = "Total time (s)"
+    COUNT_HEADER = "Count"
+    LATEST_TIME_HEADER = "Latest time (s)"
+
+    @classmethod
+    @contextmanager
+    def time(cls, description: str):
+        """Time everything within the context and store it under a given description.
+
+        If there are already timing statics for this description, update them.
+        """
+        start_time = time.perf_counter()
+        yield
+        time_taken = time.perf_counter() - start_time
+        # Update or initialize statistics for this description.
+        if description in cls.timing_statistics:
+            cls.timing_statistics[description][cls.COUNT_HEADER] += 1
+            cls.timing_statistics[description][cls.TOTAL_TIME_HEADER] += time_taken
+            cls.timing_statistics[description][cls.AVG_TIME_HEADER] = (
+                cls.timing_statistics[description][cls.TOTAL_TIME_HEADER]
+                / cls.timing_statistics[description][cls.COUNT_HEADER]
+            )
+            cls.timing_statistics[description][cls.LATEST_TIME_HEADER] = time_taken
+        else:
+            cls.timing_statistics[description] = {
+                cls.AVG_TIME_HEADER: time_taken,
+                cls.COUNT_HEADER: 1,
+                cls.TOTAL_TIME_HEADER: time_taken,
+                cls.LATEST_TIME_HEADER: time_taken,
+            }
+
+    @classmethod
+    def reset(cls, description: str | list[str] | None = None):
+        """Clear all timing statistics or just some timing statistics according to `description`."""
+        if isinstance(description, str):
+            del cls.timing_statistics[description]
+        elif isinstance(description, list):
+            for d in description:
+                del cls.timing_statistics[d]
+        else:
+            cls.timing_statistics = {}
