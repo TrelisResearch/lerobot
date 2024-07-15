@@ -24,13 +24,10 @@ def report_time(description: str):
 
 EP_IX = 100
 
-
 dataset = LeRobotDataset(repo_id="lerobot/pusht")
-
 
 with report_time("HF dataset"):
     episode_data_indices = torch.where(torch.stack(dataset.hf_dataset["episode_index"]) == EP_IX)[0]
-
 
 arr = np.memmap("/tmp/episode_index.dat", dtype=np.dtype("int64"), mode="w+", shape=len(dataset))
 arr[:] = torch.stack(dataset.hf_dataset["episode_index"]).numpy()
