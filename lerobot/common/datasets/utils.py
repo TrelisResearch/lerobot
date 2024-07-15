@@ -26,6 +26,8 @@ from PIL import Image as PILImage
 from safetensors.torch import load_file
 from torchvision import transforms
 
+from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+
 
 def flatten_dict(d, parent_key="", sep="/"):
     """Flatten a nested dictionary structure by collapsing nested keys into one key with a separator.
@@ -174,8 +176,7 @@ def load_videos(repo_id, version, root) -> Path:
 
 def load_previous_and_future_frames(
     item: dict[str, torch.Tensor],
-    hf_dataset: datasets.Dataset,
-    episode_data_index: dict[str, torch.Tensor],
+    data: LeRobotDataset,
     delta_timestamps: dict[str, list[float]],
     tolerance_s: float,
 ) -> dict[torch.Tensor]:
@@ -216,12 +217,10 @@ def load_previous_and_future_frames(
     """
     # get indices of the frames associated to the episode, and their timestamps
     ep_id = item["episode_index"].item()
-    ep_data_id_from = episode_data_index["from"][ep_id].item()
-    ep_data_id_to = episode_data_index["to"][ep_id].item()
-    ep_data_ids = torch.arange(ep_data_id_from, ep_data_id_to, 1)
+    episode_data_indices = data.get_episode_data_indices(ep_id)
 
     # load timestamps
-    ep_timestamps = hf_dataset.select_columns("timestamp")[ep_data_id_from:ep_data_id_to]["timestamp"]
+    ep_timestamps = hf_dataset.select_columns("timestamp")[episode_data_indices]["timestamp"]
     ep_timestamps = torch.stack(ep_timestamps)
 
     # we make the assumption that the timestamps are sorted

@@ -39,24 +39,19 @@ DATA_DIR = Path(os.environ["DATA_DIR"]) if "DATA_DIR" in os.environ else None
 CODEBASE_VERSION = "v1.5"
 
 
-class LeRobotDataset(torch.utils.data.Dataset):
+class LeRobotDataset:
     def __init__(
         self,
         repo_id: str,
         version: str | None = CODEBASE_VERSION,
         root: Path | None = DATA_DIR,
         split: str = "train",
-        image_transforms: Callable | None = None,
-        delta_timestamps: dict[list[float]] | None = None,
         video_backend: str | None = None,
     ):
-        super().__init__()
         self.repo_id = repo_id
         self.version = version
         self.root = root
         self.split = split
-        self.image_transforms = image_transforms
-        self.delta_timestamps = delta_timestamps
         # load data from hub or locally when root is provided
         # TODO(rcadene, aliberts): implement faster transfer
         # https://huggingface.co/docs/huggingface_hub/en/guides/download#faster-downloads
@@ -98,20 +93,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
         return keys
 
     @property
-    def video_frame_keys(self) -> list[str]:
-        """Keys to access video frames that requires to be decoded into images.
-
-        Note: It is empty if the dataset contains images only,
-        or equal to `self.cameras` if the dataset contains videos only,
-        or can even be a subset of `self.cameras` in a case of a mixed image/video dataset.
-        """
-        video_frame_keys = []
-        for key, feats in self.hf_dataset.features.items():
-            if isinstance(feats, VideoFrame):
-                video_frame_keys.append(key)
-        return video_frame_keys
-
-    @property
     def num_samples(self) -> int:
         """Number of samples/frames."""
         return len(self.hf_dataset)
@@ -130,33 +111,25 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 1e-4 to account for possible numerical error
         return 1 / self.fps - 1e-4
 
+    def get_episode_data_indices(self, episode_index: int) -> torch.tensor:
+        ep_data_id_from = self.episode_data_index["from"][episode_index].item()
+        ep_data_id_to = self.episode_data_index["to"][episode_index].item()
+        return torch.arange(ep_data_id_from, ep_data_id_to)
+
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
         item = self.hf_dataset[idx]
 
-        if self.delta_timestamps is not None:
-            item = load_previous_and_future_frames(
-                item,
-                self.hf_dataset,
-                self.episode_data_index,
-                self.delta_timestamps,
-                self.tolerance_s,
-            )
-
         if self.video:
             item = load_from_videos(
                 item,
-                self.video_frame_keys,
+                self.camera_keys,
                 self.videos_dir,
                 self.tolerance_s,
                 self.video_backend,
             )
-
-        if self.image_transforms is not None:
-            for cam in self.camera_keys:
-                item[cam] = self.image_transforms(item[cam])
 
         return item
 
@@ -171,7 +144,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
             f"  Type: {'video (.mp4)' if self.video else 'image (.png)'},\n"
             f"  Recorded Frames per Second: {self.fps},\n"
             f"  Camera Keys: {self.camera_keys},\n"
-            f"  Video Frame Keys: {self.video_frame_keys if self.video else 'N/A'},\n"
             f"  Transformations: {self.image_transforms},\n"
             f")"
         )
@@ -216,6 +188,57 @@ class LeRobotDataset(torch.utils.data.Dataset):
         obj.videos_dir = videos_dir
         obj.video_backend = video_backend if video_backend is not None else "pyav"
         return obj
+
+
+class Foo(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        data: LeRobotDataset,
+        image_transforms: Callable | None = None,
+        delta_timestamps: dict[list[float]] | None = None,
+    ):
+        self.data = data
+        self.image_transforms = image_transforms
+        self.delta_timestamps = delta_timestamps
+
+    @property
+    def fps(self) -> int:
+        """Frames per second used during data collection."""
+        return self.info["fps"]
+
+    @property
+    def timestamp_tolerance_s(self) -> float:
+        """Tolerance in seconds used to discard loaded frames when their timestamps
+        are not close enough from the requested frames. It is only used when `delta_timestamps`
+        is provided or when loading video frames from mp4 files.
+        """
+        # 1e-4 to account for possible numerical error
+        return 1 / self.fps - 1e-4
+
+    @property
+    def num_episodes(self) -> int:
+        """Number of episodes."""
+        return self.data.num_episodes
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        item = self.data[idx]
+
+        if self.delta_timestamps is not None:
+            item = load_previous_and_future_frames(
+                item,
+                self.data,
+                self.delta_timestamps,
+                self.timestamp_tolerance_s,
+            )
+
+        if self.image_transforms is not None:
+            for cam in self.data.camera_keys:
+                item[cam] = self.image_transforms(item[cam])
+
+        return item
 
 
 class MultiLeRobotDataset(torch.utils.data.Dataset):
@@ -334,20 +357,6 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
         return keys
 
     @property
-    def video_frame_keys(self) -> list[str]:
-        """Keys to access video frames that requires to be decoded into images.
-
-        Note: It is empty if the dataset contains images only,
-        or equal to `self.cameras` if the dataset contains videos only,
-        or can even be a subset of `self.cameras` in a case of a mixed image/video dataset.
-        """
-        video_frame_keys = []
-        for key, feats in self.features.items():
-            if isinstance(feats, VideoFrame):
-                video_frame_keys.append(key)
-        return video_frame_keys
-
-    @property
     def num_samples(self) -> int:
         """Number of samples/frames."""
         return sum(d.num_samples for d in self._datasets)
@@ -402,7 +411,6 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
             f"  Type: {'video (.mp4)' if self.video else 'image (.png)'},\n"
             f"  Recorded Frames per Second: {self.fps},\n"
             f"  Camera Keys: {self.camera_keys},\n"
-            f"  Video Frame Keys: {self.video_frame_keys if self.video else 'N/A'},\n"
             f"  Transformations: {self.image_transforms},\n"
             f")"
         )
