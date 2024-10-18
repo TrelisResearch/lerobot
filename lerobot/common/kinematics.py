@@ -1,5 +1,4 @@
 # ruff: noqa: N806, N815, N803
-
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -36,7 +35,6 @@ def screw_axis_to_transform(S, theta):
 
 def pose_difference_se3(pose1, pose2):
     """
-    TODO: verify as this is from chatgpt
     Calculates the SE(3) difference between two 4x4 homogeneous transformation matrices.
 
     pose1 - pose2
@@ -84,11 +82,11 @@ class KochKinematics:
         ]
     )
     # Screw axis of gripper frame wrt base frame.
-    S_BG = np.array([1, 0, 0, 0, 0.018, 0])
+    S_BG = np.array([1, 0, 0, 0, 0.024, 0.001])
     # Gripper origin to centroid transform.
     X_GoGc = np.array(
         [
-            [1, 0, 0, 0.035],
+            [1, 0, 0, 0.048],
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1],
@@ -97,18 +95,18 @@ class KochKinematics:
     # Gripper origin to tip transform.
     X_GoGt = np.array(
         [
-            [1, 0, 0, 0.07],
+            [1, 0, 0, 0.083],
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1],
         ]
     )
-    # 0-position humerus frame pose wrt base.
+    # 0-position gripper frame pose wrt base.
     X_BoGo = np.array(
         [
-            [1, 0, 0, 0.253],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.018],
+            [1, 0, 0, 0.239],
+            [0, 1, 0, -0.001],
+            [0, 0, 1, 0.024],
             [0, 0, 0, 1],
         ]
     )
@@ -124,7 +122,7 @@ class KochKinematics:
     )
 
     # Screw axis of wrist frame wrt base frame.
-    S_BR = np.array([0, 1, 0, -0.018, 0, +0.21])
+    S_BR = np.array([0, 1, 0, -0.024, 0, 0.209])
     # 0-position origin to centroid transform.
     X_RoRc = np.array(
         [
@@ -137,15 +135,15 @@ class KochKinematics:
     # 0-position wrist frame pose wrt base.
     X_BR = np.array(
         [
-            [1, 0, 0, 0.210],
+            [1, 0, 0, 0.209],
             [0, 1, 0, 0],
-            [0, 0, 1, 0.018],
+            [0, 0, 1, 0.024],
             [0, 0, 0, 1],
         ]
     )
 
     # Screw axis of forearm frame wrt base frame.
-    S_BF = np.array([0, 1, 0, -0.020, 0, +0.109])
+    S_BF = np.array([0, 1, 0, -0.020, 0, 0.108])
     # Forearm origin + centroid transform.
     X_FoFc = np.array(
         [
@@ -158,7 +156,7 @@ class KochKinematics:
     # 0-position forearm frame pose wrt base.
     X_BF = np.array(
         [
-            [1, 0, 0, 0.109],
+            [1, 0, 0, 0.108],
             [0, 1, 0, 0],
             [0, 0, 1, 0.020],
             [0, 0, 0, 1],
@@ -192,7 +190,7 @@ class KochKinematics:
         [
             [1, 0, 0, -0.017],
             [0, 1, 0, 0],
-            [0, 0, 1, 0.0035],
+            [0, 0, 1, 0.0235],
             [0, 0, 0, 1],
         ]
     )
@@ -200,7 +198,7 @@ class KochKinematics:
         [
             [1, 0, 0, 0],
             [0, 1, 0, 0],
-            [0, 0, 1, 0.02],
+            [0, 0, 1, 0.0],
             [0, 0, 0, 1],
         ]
     )
