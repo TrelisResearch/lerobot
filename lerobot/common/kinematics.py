@@ -203,7 +203,6 @@ class KochKinematics:
         ]
     )
 
-    # o3d seems to be aligning the box frame so that it is longest to longest to shortest on xyz.
     base_X0 = np.array(
         [
             [0, 0, 1, 0],

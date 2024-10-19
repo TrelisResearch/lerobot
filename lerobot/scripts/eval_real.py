@@ -1,9 +1,8 @@
 import argparse
 import json
 import logging
-import os
-import platform
 import random
+import threading
 import time
 from collections import defaultdict
 from datetime import datetime as dt
@@ -17,6 +16,7 @@ from termcolor import colored
 from torch import nn
 from tqdm import trange
 
+from lerobot.common.datasets.online_buffer import LeRobotDatasetV2
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.policies.policy_protocol import Policy
 from lerobot.common.policies.rollout_wrapper import PolicyRolloutWrapper
@@ -34,35 +34,23 @@ from lerobot.common.utils.digital_twin import DigitalTwin
 from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config, init_logging, set_global_seed
 from lerobot.common.vision import GoalSetter, segment_hsv
 from lerobot.scripts.eval import get_pretrained_policy_path
-
-
-def say(text, blocking=False):
-    # Check if mac, linux, or windows.
-    if platform.system() == "Darwin":
-        cmd = f'say "{text}"{"" if blocking else " &"}'
-    elif platform.system() == "Linux":
-        cmd = f'spd-say "{text}"{"  --wait" if blocking else ""}'
-    elif platform.system() == "Windows":
-        # TODO(rcadene): Make blocking option work for Windows
-        cmd = (
-            'PowerShell -Command "Add-Type -AssemblyName System.Speech; '
-            f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{text}')\""
-        )
-
-    os.system(cmd)
+from lerobot.scripts.utils import say
 
 
 def rollout(
     robot: ManipulatorRobot,
-    policy: Policy,
+    policy: Policy | None,
     fps: float,
     n_action_buffer: int = 0,
     warmup_s: float = 5.0,
-    use_relative_actions: bool = False,
+    use_relative_actions: bool = True,
     max_steps: int | None = None,
     visualize_img: bool = False,
     visualize_3d: bool = False,
     enable_intevention: bool = False,
+    n_pad_episode_data: int = 0,
+    manual_reset: bool = False,
+    goal: str | None = None,
 ) -> dict:
     goal_setter_left = GoalSetter.from_mask_file("outputs/goal_mask_left.npy")
     goal_setter_right = GoalSetter.from_mask_file("outputs/goal_mask_right.npy")
@@ -72,42 +60,66 @@ def rollout(
 
     observation: dict[str, torch.Tensor] = robot.capture_observation()
     reward_left, *_ = calc_reward_cube_push(
-        img=observation["observation.images.webcam"].numpy(),
+        img=observation["observation.images.main"].numpy(),
         goal_mask=goal_mask_left,
         current_joint_pos=observation["observation.state"].numpy(),
         oob_reward=0,
         occlusion_reward=0,
     )
     reward_right, *_ = calc_reward_cube_push(
-        img=observation["observation.images.webcam"].numpy(),
+        img=observation["observation.images.main"].numpy(),
         goal_mask=goal_mask_right,
         current_joint_pos=observation["observation.state"].numpy(),
         oob_reward=0,
         occlusion_reward=0,
     )
-    if reward_left > -0.5:  # The block is on the left
-        goal_mask = goal_mask_right  # Goal is on the right
-        goal = "right"
-        start_pos = "left"
-    elif reward_right > -0.5:  # The block is on the right
-        goal_mask = goal_mask_left  # goal is on the left
-        goal = "left"
-        start_pos = "right"
-    elif random.random() > 0.5:
-        goal_mask = goal_mask_right  # goal is on the right
-        goal = "right"
-        start_pos = "left"  # if random.random() < 0.9 else "right"  # make it more likely to start left
+    if goal is None:
+        if reward_left > -0.5:  # The block is on the left
+            goal_mask = goal_mask_right  # Goal is on the right
+            goal = "right"
+            start_pos = "left"
+        elif reward_right > -0.5:  # The block is on the right
+            goal_mask = goal_mask_left  # goal is on the left
+            goal = "left"
+            start_pos = "right"
+        elif random.random() > 0.5:
+            goal_mask = goal_mask_right  # goal is on the right
+            goal = "right"
+            start_pos = "left"  # if random.random() < 0.9 else "right"  # make it more likely to start left
+        else:
+            goal_mask = goal_mask_left  # goal is on the left
+            goal = "left"
+            start_pos = "right"  # if random.random() < 0.9 else "left"  # make it more likely to start right.
     else:
-        goal_mask = goal_mask_left  # goal is on the left
-        goal = "left"
-        start_pos = "right"  # if random.random() < 0.9 else "left"  # make it more likely to start right.
+        if goal == "left":
+            goal_mask = goal_mask_left
+            start_pos = "right"
+        elif goal == "right":
+            goal_mask = goal_mask_right
+            start_pos = "left"
+        else:
+            raise ValueError
 
-    say(f"Go {goal}", blocking=True)
-    reset_for_cube_push(robot, right=start_pos == "right")
+    if manual_reset:
+        msg = "Reset the environment and robot. Press return in the terminal when ready."
+        say(msg)
+        keyboard_thread = threading.Thread(target=lambda: input(msg), daemon=True)
+        keyboard_thread.start()
+        while True:
+            start = time.perf_counter()
+            robot.teleop_step()
+            if not keyboard_thread.is_alive():
+                break
+            time.sleep(max(0, 1 / fps - (time.perf_counter() - start)))
+        say("Go!")
+    else:
+        reset_for_cube_push(robot, right=start_pos == "right")
+
+    # say(f"Go {goal}", blocking=True)
 
     while True:
         observation: dict[str, torch.Tensor] = robot.capture_observation()
-        cube_mask, _ = segment_hsv(observation["observation.images.webcam"].numpy())
+        cube_mask, _ = segment_hsv(observation["observation.images.main"].numpy())
         if np.count_nonzero(cube_mask & in_bounds_mask) == np.count_nonzero(cube_mask):
             break
         say("Cube is out of bounds! Help.")
@@ -123,12 +135,6 @@ def rollout(
 
     policy_rollout_wrapper.reset()
 
-    step = 0
-    start_time = time.perf_counter()
-
-    def to_relative_time(t):
-        return t - start_time
-
     episode_data = defaultdict(list)
 
     if enable_intevention:
@@ -141,6 +147,13 @@ def rollout(
     first_follower_pos = None  # Will be held during the warmup
     prior_absolute_action = None
     surrender_control = False
+    step = 0
+    start_time = time.perf_counter()
+    is_warmup = True
+
+    def to_relative_time(t):
+        return t - start_time
+
     while True:
         is_dropped_cycle = False
         over_time = False
@@ -150,10 +163,10 @@ def rollout(
 
         annotated_img = None
         if not is_warmup:
-            episode_data["index"].append(step)
-            episode_data["episode_index"].append(0)
-            episode_data["timestamp"].append(start_step_time)
-            episode_data["frame_index"].append(step)
+            episode_data[LeRobotDatasetV2.INDEX_KEY].append(step)
+            episode_data[LeRobotDatasetV2.EPISODE_INDEX_KEY].append(0)
+            episode_data[LeRobotDatasetV2.TIMESTAMP_KEY].append(start_step_time)
+            episode_data[LeRobotDatasetV2.FRAME_INDEX_KEY].append(step)
             for k in observation:
                 if k.startswith("observation.image"):
                     img = observation[k].numpy().copy()
@@ -169,7 +182,7 @@ def rollout(
                 else:
                     prior_action = np.zeros_like(episode_data["action"][-1])
                 reward, success, do_terminate, info = calc_reward_cube_push(
-                    img=observation["observation.images.webcam"].numpy(),
+                    img=observation["observation.images.main"].numpy(),
                     goal_mask=goal_mask,
                     current_joint_pos=observation["observation.state"].numpy(),
                     action=episode_data["action"][-1],
@@ -182,7 +195,7 @@ def rollout(
                 episode_data["next.done"].append(success or do_terminate)
 
         if annotated_img is None:
-            annotated_img = observation["observation.images.webcam"].numpy()
+            annotated_img = observation["observation.images.main"].numpy()
 
         annotated_img[where_goal] = annotated_img[where_goal] // 2 + np.array([127, 127, 127])
 
@@ -246,25 +259,7 @@ def rollout(
         if action_sequence is not None and visualize_3d:
             digital_twin.set_twin_pose(follower_pos, follower_pos + action_sequence.numpy())
 
-        if step == 0:
-            # On the first step we should just use the first action. We are guaranteed that action_sequence is
-            # not None.
-            action = action_sequence[0]
-            # We also need to store the next action. If the next action is not available, we adopt the
-            # strategy of repeating the current action.
-            if len(action_sequence) > 1:
-                next_action = action_sequence[1].clone()
-            else:
-                next_action = action.clone()
-                is_dropped_cycle = True
-        else:
-            # All steps after  the first must use the `next_action` from the previous step.
-            action = next_action.clone()
-            if action_sequence is not None and len(action_sequence) > 1:
-                next_action = action_sequence[1].clone()
-            else:
-                next_action = action.clone()
-                is_dropped_cycle = True
+        action = action_sequence[0]
 
         if visualize_img:
             for name in to_visualize:
@@ -358,43 +353,51 @@ def rollout(
 
     for k in episode_data:
         episode_data[k] = np.stack(episode_data[k])
-        if k in ["action", "observation.state", "next.reward", "timestamp"]:
+        if k in ["action", "observation.state", "next.reward", LeRobotDatasetV2.TIMESTAMP_KEY]:
             episode_data[k] = episode_data[k].astype(np.float32)
 
     # HACK: drop the first frame because of first inference being slow.
     for k in episode_data:
         episode_data[k] = episode_data[k][1:]
-    episode_data["frame_index"] -= 1
-    episode_data["index"] -= 1
+    episode_data[LeRobotDatasetV2.FRAME_INDEX_KEY] -= 1
+    episode_data[LeRobotDatasetV2.INDEX_KEY] -= 1
 
-    # HACK: Fill out the episode repeating the last observation, action, reward, and success status.
-    # This allows me to effectively increase the magnitude of the success / OOB reward without confusing the
-    # reward predictor. But it may overwhelm the data buffer with frozen data points?
-    # deficit = max_steps - len(episode_data["index"])
-    deficit = policy.config.horizon - 1
-    if do_terminate and deficit > 0:
-        episode_data["index"] = np.arange(len(episode_data["index"]) + deficit)
-        episode_data["frame_index"] = np.arange(len(episode_data["frame_index"]) + deficit)
-        episode_data["episode_index"] = np.full(
-            (len(episode_data["episode_index"]) + deficit,), episode_data["episode_index"][0]
+    # HACK: Add frames to the episode repeating the last observation, action, reward, and success status.
+    # This allows me to effectively increase the magnitude of the success / OOB reward without causing large
+    # gradients for the reward network.
+    if do_terminate and n_pad_episode_data > 0:
+        episode_data[LeRobotDatasetV2.INDEX_KEY] = np.arange(
+            len(episode_data[LeRobotDatasetV2.INDEX_KEY]) + n_pad_episode_data
         )
-        episode_data["timestamp"] = np.concatenate(
-            [episode_data["timestamp"], episode_data["timestamp"][-1] + (1 + np.arange(deficit)) / fps]
+        episode_data[LeRobotDatasetV2.FRAME_INDEX_KEY] = np.arange(
+            len(episode_data[LeRobotDatasetV2.FRAME_INDEX_KEY]) + n_pad_episode_data
+        )
+        episode_data[LeRobotDatasetV2.EPISODE_INDEX_KEY] = np.full(
+            (len(episode_data[LeRobotDatasetV2.EPISODE_INDEX_KEY]) + n_pad_episode_data,),
+            episode_data[LeRobotDatasetV2.EPISODE_INDEX_KEY][0],
+        )
+        episode_data[LeRobotDatasetV2.TIMESTAMP_KEY] = np.concatenate(
+            [
+                episode_data[LeRobotDatasetV2.TIMESTAMP_KEY],
+                episode_data[LeRobotDatasetV2.TIMESTAMP_KEY][-1] + (1 + np.arange(n_pad_episode_data)) / fps,
+            ]
         )
         observation_keys = [k for k in episode_data if k.startswith("observation.")]
         for k in ["next.reward", "next.success", "next.done", "action", *observation_keys]:
             extra_kwargs = {"mode": "constant", "constant_values": 0} if k == "action" else {"mode": "edge"}
             episode_data[k] = np.pad(
-                episode_data[k], [(0, deficit)] + [(0, 0)] * (episode_data[k].ndim - 1), **extra_kwargs
+                episode_data[k],
+                [(0, n_pad_episode_data)] + [(0, 0)] * (episode_data[k].ndim - 1),
+                **extra_kwargs,
             )
-        # episode_data["next.done"] = np.zeros(len(episode_data["next.done"]) + deficit, dtype=bool)
-
-    # episode_data["next.done"][-2:] = True
 
     policy_rollout_wrapper.close_thread()
 
     if visualize_3d:
         digital_twin.close()
+
+    # Reset the timestamp to start form zero.
+    episode_data[LeRobotDatasetV2.TIMESTAMP_KEY] -= episode_data[LeRobotDatasetV2.TIMESTAMP_KEY][0]
 
     return episode_data
 
@@ -435,11 +438,14 @@ def eval_policy(
                 max_steps=max_steps,
                 visualize_img=visualize_img,
                 visualize_3d=visualize_3d,
+                n_pad_episode_data=policy.config.horizon - 1,
             )
             # Continue the episode and data indices.
-            episode_data["episode_index"] += episode_index
+            episode_data[LeRobotDatasetV2.EPISODE_INDEX_KEY] += episode_index
             if len(episodes_data) > 0:
-                episode_data["index"] += episodes_data[-1]["index"][-1] + 1
+                episode_data[LeRobotDatasetV2.INDEX_KEY] += (
+                    episodes_data[-1][LeRobotDatasetV2.INDEX_KEY][-1] + 1
+                )
             episodes_data.append(episode_data)
             sum_rewards.append(sum(episode_data["next.reward"]))
             max_rewards.append(max(episode_data["next.reward"]))

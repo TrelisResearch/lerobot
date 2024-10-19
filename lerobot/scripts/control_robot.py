@@ -100,8 +100,6 @@ python lerobot/scripts/control_robot.py record \
 
 import argparse
 import logging
-import os
-import platform
 import shutil
 import time
 import traceback
@@ -130,26 +128,11 @@ from lerobot.common.robot_devices.utils import busy_wait
 from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config, init_logging, set_global_seed
 from lerobot.common.vision import GoalSetter
 from lerobot.scripts.eval import get_pretrained_policy_path
+from lerobot.scripts.utils import say
 
 ########################################################################################
 # Utilities
 ########################################################################################
-
-
-def say(text, blocking=False):
-    # Check if mac, linux, or windows.
-    if platform.system() == "Darwin":
-        cmd = f'say "{text}"{"" if blocking else " &"}'
-    elif platform.system() == "Linux":
-        cmd = f'spd-say "{text}"{" --wait" if blocking else ""}'
-    elif platform.system() == "Windows":
-        # TODO(rcadene): Make blocking option work for Windows
-        cmd = (
-            'PowerShell -Command "Add-Type -AssemblyName System.Speech; '
-            f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{text}')\""
-        )
-
-    os.system(cmd)
 
 
 def save_image(img_tensor, key, frame_index, episode_index, videos_dir):
@@ -310,6 +293,7 @@ def record(
     run_compute_stats=True,
     push_to_hub=True,
     force_override=False,
+    n_pad_frames=0,
 ):
     # TODO(rcadene): Add option to record logs
     # TODO(rcadene): Clean this function via decomposition in higher level functions
@@ -542,6 +526,36 @@ def record(
         done = np.zeros(num_frames, dtype=bool)
         done[-1] = True
         ep_dict["next.done"] = done
+
+        # HACK: Add frames to the episode repeating the last observation, action, reward, and success status.
+        # This allows me to effectively increase the magnitude of the success / OOB reward without causing
+        # large gradients for the reward network.
+        if do_terminate and n_pad_frames > 0:
+            ep_dict[LeRobotDatasetV2.INDEX_KEY] = np.arange(
+                len(ep_dict[LeRobotDatasetV2.INDEX_KEY]) + n_pad_frames
+            )
+            ep_dict[LeRobotDatasetV2.FRAME_INDEX_KEY] = np.arange(
+                len(ep_dict[LeRobotDatasetV2.FRAME_INDEX_KEY]) + n_pad_frames
+            )
+            ep_dict[LeRobotDatasetV2.EPISODE_INDEX_KEY] = np.full(
+                (len(ep_dict[LeRobotDatasetV2.EPISODE_INDEX_KEY]) + n_pad_frames,),
+                ep_dict[LeRobotDatasetV2.EPISODE_INDEX_KEY][0],
+            )
+            ep_dict[LeRobotDatasetV2.TIMESTAMP_KEY] = np.concatenate(
+                [
+                    ep_dict[LeRobotDatasetV2.TIMESTAMP_KEY],
+                    ep_dict[LeRobotDatasetV2.TIMESTAMP_KEY][-1] + (1 + np.arange(n_pad_frames)) / fps,
+                ]
+            )
+            observation_keys = [k for k in ep_dict if k.startswith("observation.")]
+            for k in ["next.reward", "next.success", "next.done", "action", *observation_keys]:
+                extra_kwargs = (
+                    {"mode": "constant", "constant_values": 0} if k == "action" else {"mode": "edge"}
+                )
+                ep_dict[k] = np.pad(
+                    ep_dict[k], [(0, n_pad_frames)] + [(0, 0)] * (ep_dict[k].ndim - 1), **extra_kwargs
+                )
+
         dataset.add_episodes(ep_dict)
 
         is_last_episode = stop_recording or len(dataset.get_unique_episode_indices()) == num_episodes
@@ -714,6 +728,13 @@ if __name__ == "__main__":
         type=str,
         nargs="*",
         help="Any key=value arguments to override config values (use dots for.nested=overrides)",
+    )
+    parser_record.add_argument(
+        "--n-pad-frames",
+        type=int,
+        default=0,
+        help="Number of padding frames to add to the end of each terminated episode. These are used to "
+        "effectively multiply the final reward by `n_pad_frames+1`.",
     )
 
     parser_replay = subparsers.add_parser("replay", parents=[base_parser])

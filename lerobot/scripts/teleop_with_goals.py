@@ -32,7 +32,7 @@ def compute_state_value(tdmpc: TDMPCPolicy, observation_dict):
     # NOTE: Order of observations matters here.
     encode_keys = []
     if tdmpc.expected_image_key is not None:
-        encode_keys.append("observation.images.webcam")
+        encode_keys.append("observation.images.main")
     if tdmpc._use_env_state:
         encode_keys.append("observation.environment_state")
     encode_keys.append("observation.state")
@@ -62,15 +62,8 @@ if __name__ == "__main__":
     robot.connect()
 
     tdmpc = None
-    # tdmpc = TDMPCPolicy.from_pretrained(
-    #     "outputs/train/2024-09-09/18-41-28_tdmpc_push_cube/checkpoints/0010000/pretrained_model",
-    # )
-    # tdmpc.eval()
-    # tdmpc.cuda()
-
-    save_goal_mask_path = Path("outputs/goal_mask_right.npy")
-    goal_setter = GoalSetter.from_mask_file(save_goal_mask_path)
-
+    goal_direction = "right"
+    goal_setter = GoalSetter.from_mask_file(Path(f"outputs/goal_mask_{goal_direction}.npy"))
     goal_mask = goal_setter.get_goal_mask()
     where_goal = np.where(goal_mask > 0)
 
@@ -91,11 +84,10 @@ if __name__ == "__main__":
             V = 0
         action = action_dict["action"].numpy()
         relative_action = (action_dict["action"] - obs_dict["observation.state"]).numpy()
-        # print(max_relative_action := np.maximum(max_relative_action, np.abs(relative_action)))
-        img = obs_dict["observation.images.webcam"].numpy()
+        img = obs_dict["observation.images.main"].numpy()
         annotated_img = img.copy()
         reward, _, _, info = calc_reward_cube_push(
-            img=obs_dict["observation.images.webcam"].numpy(),
+            img=obs_dict["observation.images.main"].numpy(),
             goal_mask=goal_mask,
             current_joint_pos=obs_dict["observation.state"].numpy(),
             action=relative_action,
@@ -128,6 +120,11 @@ if __name__ == "__main__":
         k = cv2.waitKey(1)
         if k == ord("q"):
             break
+        elif k == ord("s"):
+            goal_direction = "left" if goal_direction == "right" else "right"
+            goal_setter = GoalSetter.from_mask_file(Path(f"outputs/goal_mask_{goal_direction}.npy"))
+            goal_mask = goal_setter.get_goal_mask()
+            where_goal = np.where(goal_mask > 0)
         elapsed = time.perf_counter() - start
         if elapsed > 1 / args.fps:
             logging.warning(f"Loop iteration went overtime: {elapsed=}.")

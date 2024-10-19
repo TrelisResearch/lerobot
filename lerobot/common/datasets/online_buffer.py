@@ -712,7 +712,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
 
     def _remove_stale_image_files(self):
         """Remove image files that are not aligned with the episode / frame indices in the memmaps."""
-        if self._use_as_fifo_buffer and LeRobotDatasetV2ImageMode.needs_decoding(self._image_mode):
+        if LeRobotDatasetV2ImageMode.needs_decoding(self._image_mode):
             relevant_file_names = []
             if self._image_mode == LeRobotDatasetV2ImageMode.VIDEO:
                 for k in self.camera_keys:
@@ -810,7 +810,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
                     / self.VIDEOS_DIR
                     / self.VIDEO_NAME_FSTRING.format(data_key=k, episode_index=episode_index),
                     timestamps=self._data[self.TIMESTAMP_KEY][data_mask],
-                    tolerance_s=1e-8,
+                    tolerance_s=1e-4,
                     backend="pyav",
                     to_pytorch_format=False,
                 )
@@ -950,7 +950,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
                     / self.VIDEOS_DIR
                     / self.VIDEO_NAME_FSTRING.format(data_key=k, episode_index=item[self.EPISODE_INDEX_KEY]),
                     timestamps=[item[self.TIMESTAMP_KEY]],
-                    tolerance_s=1e-8,  # we expect the timestamp to match exactly
+                    tolerance_s=1 / self.fps / 2,  # allow half a period of error
                     backend="pyav",
                     to_pytorch_format=True,
                 )[0]
