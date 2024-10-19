@@ -14,7 +14,7 @@ We'll experiment with [LeRobot's TD-MPC](./lerobot/common/policies/tdmpc/modelin
 
 You'll need to get materials and set up your workspace like so:
 
-![alt text](image.jpg)
+![alt text](media/push_cube_setup.jpg)
 
 Here's what we see in the image:
 - The base of a **Koch v1.0 robot** is at the top of the image.
