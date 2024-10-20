@@ -810,7 +810,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
                     / self.VIDEOS_DIR
                     / self.VIDEO_NAME_FSTRING.format(data_key=k, episode_index=episode_index),
                     timestamps=self._data[self.TIMESTAMP_KEY][data_mask],
-                    tolerance_s=1e-4,
+                    tolerance_s=1 / self.fps / 2,
                     backend="pyav",
                     to_pytorch_format=False,
                 )

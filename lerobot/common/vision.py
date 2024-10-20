@@ -14,7 +14,7 @@ def segment_hsv(img) -> tuple[np.ndarray, np.ndarray]:
         (
             (hsv[..., 0] >= 195 / 2)
             & (hsv[..., 0] <= 260 / 2)
-            & (hsv[..., 1] >= 200)
+            & (hsv[..., 1] >= 240)
             & (hsv[..., 2] >= 100)
             & (hsv[..., 2] <= 240)
         )

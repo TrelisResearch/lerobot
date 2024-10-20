@@ -1,3 +1,17 @@
+"""
+For LeRobot Hackathon.
+
+Teleoperation script with visualization of the camera view and calculation of reward function.
+
+
+For the reward can verify the following:
+- The reward suddenly goes more negative when you git the table or go far out of the perimeter, or go too high.
+- The reward goes up the closer the cube is to being in the goal region.
+- The reward suddenly goes high if the cube is entirely in the goal region.
+- You get significant negative reward if you occlude the cube.
+- The more erratic your movement of the arm, the more of a movement penalty you get.
+"""
+
 import argparse
 import logging
 import time
@@ -61,7 +75,7 @@ if __name__ == "__main__":
     robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/koch_.yaml"))
     robot.connect()
 
-    tdmpc = None
+    tdmpc = None  # Set this up if you want to see the predicted value function
     goal_direction = "right"
     goal_setter = GoalSetter.from_mask_file(Path(f"outputs/goal_mask_{goal_direction}.npy"))
     goal_mask = goal_setter.get_goal_mask()
@@ -69,7 +83,7 @@ if __name__ == "__main__":
 
     # Test it out
     step = 0
-    max_relative_action = torch.zeros(6)
+    maximum_relative_action = np.zeros(6)
     prior_relative_action = np.zeros(6)
     while True:
         start = time.perf_counter()
@@ -84,6 +98,8 @@ if __name__ == "__main__":
             V = 0
         action = action_dict["action"].numpy()
         relative_action = (action_dict["action"] - obs_dict["observation.state"]).numpy()
+        maximum_relative_action = np.maximum(np.abs(relative_action), maximum_relative_action)
+        print(maximum_relative_action)
         img = obs_dict["observation.images.main"].numpy()
         annotated_img = img.copy()
         reward, _, _, info = calc_reward_cube_push(
@@ -123,6 +139,10 @@ if __name__ == "__main__":
         elif k == ord("s"):
             goal_direction = "left" if goal_direction == "right" else "right"
             goal_setter = GoalSetter.from_mask_file(Path(f"outputs/goal_mask_{goal_direction}.npy"))
+            goal_mask = goal_setter.get_goal_mask()
+            where_goal = np.where(goal_mask > 0)
+        elif k == ord("m"):
+            goal_setter = GoalSetter.from_mask_file(Path("outputs/goal_mask_center.npy"))
             goal_mask = goal_setter.get_goal_mask()
             where_goal = np.where(goal_mask > 0)
         elapsed = time.perf_counter() - start

@@ -101,7 +101,7 @@ def rollout(
             raise ValueError
 
     if manual_reset:
-        msg = "Reset the environment and robot. Press return in the terminal when ready."
+        msg = f"Going {goal}. Reset the environment and robot. Press return in the terminal when ready."
         say(msg)
         keyboard_thread = threading.Thread(target=lambda: input(msg), daemon=True)
         keyboard_thread.start()
@@ -113,6 +113,7 @@ def rollout(
             time.sleep(max(0, 1 / fps - (time.perf_counter() - start)))
         say("Go!")
     else:
+        say(f"Go {goal}")
         reset_for_cube_push(robot, right=start_pos == "right")
 
     # say(f"Go {goal}", blocking=True)
@@ -255,11 +256,10 @@ def rollout(
 
             if action_sequence is not None:
                 action_sequence = action_sequence.squeeze(1)  # remove batch dim
+                action = action_sequence[0]
 
         if action_sequence is not None and visualize_3d:
             digital_twin.set_twin_pose(follower_pos, follower_pos + action_sequence.numpy())
-
-        action = action_sequence[0]
 
         if visualize_img:
             for name in to_visualize:

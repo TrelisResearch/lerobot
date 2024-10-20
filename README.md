@@ -29,4 +29,38 @@ Here's what we see in the image:
 
 I'll highlight the main changes and additions relative to the main LeRobot fork. The code is far from perfect and is quite hacky in places:
 
-- `train.py`: Updated to use the real robot environment.
+- `rl.py`: Reward calculation and environment reset.
+- `lerobot/scripts/record_episodes.py`: Alternative to `control_robot.py` used in `main` for recording offline datasets.
+- `lerobot/common/dataset/online_buffer.py`: Uses LeRobotDatasetV2 which is not yet in `main`.
+- `lerobot/scripts/train.py`: Updated to use the real robot environment instead of sim environments. Maybe has some minor improvements on the online RL loop. Uses LeRobotDatsetV2.
+- `lerobot/scripts/eval_real.py`: Instead of `eval.py` in `main`. It does the rollout on a real robot instead of a sim environment.
+- `lerobot/common/policies/rollout_wrapper.py`: Special logic for running inference asynchronously and managing observation and action queues. Makes it possible to roll out a policy even if inference time is slower than the control loop. I've also added a `run_inference` method to the TD-MPC policy, which is used by the wrapper.
+- `lerobot/scripts/create_goal_masks.py`: Used to draw the goal regions for the cube.
+- `lerobot/scripts/teleop_with_goals.py`: Teleop the robot and visualize the reward.
+
+## Specific resources (about this task)
+
+Here are some quick tutorials on some of the steps we'll need to do to set up and run our experiments.
+
+Goal mask creation: https://youtu.be/EXv4F3_cjBA
+
+Verifying the goal mask: https://youtu.be/ugY9WlYZNp0
+
+Verifying the reward function and workspace bounds: https://youtu.be/FG4Fa2ISmrQ
+
+How the segmentation algorithm (for getting the cube location for calculating the reward) works: https://youtu.be/S4WzHskRg-0
+
+Basics of recording a dataset: https://youtu.be/R9PsRLHPQPk
+
+How the policy outputs are scaled: https://youtu.be/t1T0RoY9syg
+
+Getting started with training: https://youtu.be/NNP4pIjHZqM
+
+## General resources (about TD-MPC)
+
+You can look into the TD-MPC family:
+- [TD-MPC paper](https://arxiv.org/abs/2203.04955). TD-MPC is the core algorithm we'll be using.
+- [FOWM project page](https://www.yunhaifeng.com/FOWM/). Some tweaks/improvements to TD-MPC. This is what our code follows.
+- [TD-MPC2 project page](https://www.tdmpc2.com/). We won't be going this way, but just out of interest.
+- [LeRobot Tech Talk by Nicklas Hansen (first author TD-MPC)](https://www.youtube.com/watch?v=5d9W0I2mpNg)
+- Coming soon... my own video with a deep dive explanation of how TD-MPC works.

@@ -1,3 +1,26 @@
+"""
+For LeRobot Hackathon.
+
+LeRobot already has a script for recording datasets but I made this one for two reasons:
+1. Most importantly, I want to gather the data the same way it is done during the online rollout part of the
+   training loop (ie, via the `rollout` function).
+2. It uses LeRobotDatasetV2.
+
+Tips:
+- Aim to have the gripper pointing down most of the time. This removes a potential source of variability.
+- Always start the arm near the edge of the workspace, on the side opposite to the goal region. So, if the
+  goal is to push the cube left, start the arm just inside the workspace, all the way to the right.
+- When you start recording, have the cube on the right, as the first episode will have a goal of pushing it
+  left.
+- Record about half of the episodes with the cube starting right near the gripper (hint: you don't really even
+  need to reset the cube manually, as the previous episode will have put the cube where you want it for the
+  current episode). Record the other half of the episodes with the cube starting in random places between the
+  two goal regions.
+- Use the visualization to verify that the reward is being calculated correctly.
+- If you have the patience, gather 100 episodes. This is what I did a few weeks ago (I am doing a run now and
+  it looks like it's going to work with 40 but maybe with a slightly slower start).
+"""
+
 import argparse
 import shutil
 from pathlib import Path
@@ -71,7 +94,7 @@ if __name__ == "__main__":
         if episode_ix >= args.num_episodes:
             break
         goal = "left" if episode_ix % 2 == 0 else "right"
-        msg = f"Episode {episode_ix}. Going {goal}."
+        msg = f"{episode_ix}."
         say(msg, blocking=True)
         print(msg)
         episode_data = rollout(
@@ -94,9 +117,11 @@ if __name__ == "__main__":
                 print("Invalid input. Try again.")
             else:
                 break
-        if res == "":
+        if res.lower() in ["", "q"]:
             episode_ix += 1
             dataset.add_episodes(episode_data)
+            if res.lower() == "q":
+                break
         elif res.lower() == "n":
             continue
 
