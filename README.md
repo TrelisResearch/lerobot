@@ -25,6 +25,10 @@ Here's what we see in the image:
   - Note: It's important that this has some height to it to prevent the cube going out of bounds. But it should be so high that the arm can't push against the cube from outside, when the cube is up against the edge.
   - Note: Notice that my rails are long enough for me to make the cube's workspace large if I want. I just need to translate the bottom rail down, and the top rail up a bit.
 
+Additionally:
+- You might want a tripod to get a good camera angle.
+- You might want a small desk lamp for good lighting. There is a basic segmentation algorithm to get the position of the cube that relies on this.
+
 ## Code
 
 I'll highlight the main changes and additions relative to the main LeRobot fork. The code is a little hacky but gets the job done, so it's important you take ownership of it rather than blindly trust it :)
