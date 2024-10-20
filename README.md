@@ -27,7 +27,7 @@ Here's what we see in the image:
 
 ## Code
 
-I'll highlight the main changes and additions relative to the main LeRobot fork. The code is far from perfect and is quite hacky in places:
+I'll highlight the main changes and additions relative to the main LeRobot fork. The code is a little hacky but gets the job done, so it's important you take ownership of it rather than blindly trust it :)
 
 - `rl.py`: Reward calculation and environment reset.
 - `lerobot/scripts/record_episodes.py`: Alternative to `control_robot.py` used in `main` for recording offline datasets.
