@@ -22,7 +22,7 @@ Here's what we see in the image:
 - The **blue cube (3x3x3 cm)** will be pushed around by the robot arm. It's important that nothing else is blue in the scene, as we will be using simple color segmentation code to segment out the cube. You can use a different color if you want, you'll just need to tweak the segmentation params.
 - The two smaller rectangular regions inside the larger one are the goal regions for the cube (they alternate). Use any means you want to outline the goal regions in your setup. **I used white sports tape**.
 - The outside rectangular region forms the boundaries of the cube's world. Use any means you want to set this up. **I used white cardboard strips with a longitudinal fold in the middle**.
-  - Note: It's important that this has some height to it to prevent the cube going out of bounds. But it should be so high that the arm can't push against the cube from outside, when the cube is up against the edge.
+  - Note: It's important that this has some height to it to prevent the cube going out of bounds. But it shouldn't be so high that the arm can't push against the cube from outside, when the cube is up against the edge.
   - Note: Notice that my rails are long enough for me to make the cube's workspace large if I want. I just need to translate the bottom rail down, and the top rail up a bit.
 
 Additionally:
