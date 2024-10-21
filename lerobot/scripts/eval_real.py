@@ -37,6 +37,34 @@ from lerobot.scripts.eval import get_pretrained_policy_path
 from lerobot.scripts.utils import say
 
 
+class TeleopPolicy(torch.nn.Module):
+    """
+    HACK: Wrap leader arm in a policy module so that we can use it in the `rollout` function.
+    """
+
+    def __init__(self, robot: ManipulatorRobot):
+        super().__init__()
+        self.robot = robot
+        self._dummy_param = torch.nn.Parameter(torch.tensor(0), requires_grad=False)
+
+    @property
+    def input_keys(self) -> list[str]:
+        return ["observation.state"]
+
+    @property
+    def n_obs_steps(self) -> int:
+        return 1
+
+    def run_inference(self, observation_batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Returns relative joint angles"""
+        # unsqueeze twice for batch and temporal dimension
+        return (
+            torch.from_numpy(self.robot.leader_arms["main"].read("Present_Position"))
+            .unsqueeze(0)
+            .unsqueeze(0)
+        ) - observation_batch["observation.state"]
+
+
 def rollout(
     robot: ManipulatorRobot,
     policy: Policy | None,
@@ -246,13 +274,16 @@ def rollout(
             if isinstance(policy, TDMPCPolicy):
                 policy.reset()
 
-            action_sequence = policy_rollout_wrapper.provide_observation_get_actions(
-                observation,
-                observation_timestamp=start_step_time,
-                first_action_timestamp=start_step_time,
-                strict_observation_timestamps=step > 0,
-                timeout=timeout,
-            )
+            if isinstance(Policy, TeleopPolicy):
+                action_sequence = policy.run_inference(observation)
+            else:
+                action_sequence = policy_rollout_wrapper.provide_observation_get_actions(
+                    observation,
+                    observation_timestamp=start_step_time,
+                    first_action_timestamp=start_step_time,
+                    strict_observation_timestamps=step > 0,
+                    timeout=timeout,
+                )
 
             if action_sequence is not None:
                 action_sequence = action_sequence.squeeze(1)  # remove batch dim

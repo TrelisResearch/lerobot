@@ -25,7 +25,6 @@ import argparse
 import shutil
 from pathlib import Path
 
-import torch
 from safetensors.torch import save_file
 
 from lerobot.common.datasets.compute_stats import compute_stats
@@ -34,36 +33,7 @@ from lerobot.common.datasets.utils import flatten_dict
 from lerobot.common.robot_devices.robots.factory import make_robot
 from lerobot.common.robot_devices.robots.manipulator import ManipulatorRobot
 from lerobot.common.utils.utils import init_hydra_config, init_logging
-from lerobot.scripts.eval_real import rollout, say
-
-
-class TeleopPolicy(torch.nn.Module):
-    """
-    HACK: Wrap leader arm in a policy module so that we can use it in the `rollout` function.
-    """
-
-    def __init__(self, robot: ManipulatorRobot):
-        super().__init__()
-        self.robot = robot
-        self._dummy_param = torch.nn.Parameter(torch.tensor(0), requires_grad=False)
-
-    @property
-    def input_keys(self) -> list[str]:
-        return ["observation.state"]
-
-    @property
-    def n_obs_steps(self) -> int:
-        return 1
-
-    def run_inference(self, observation_batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        """Returns relative joint angles"""
-        # unsqueeze twice for batch and temporal dimension
-        return (
-            torch.from_numpy(self.robot.leader_arms["main"].read("Present_Position"))
-            .unsqueeze(0)
-            .unsqueeze(0)
-        ) - observation_batch["observation.state"]
-
+from lerobot.scripts.eval_real import TeleopPolicy, rollout, say
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
