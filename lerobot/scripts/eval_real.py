@@ -274,9 +274,11 @@ def rollout(
             if isinstance(policy, TDMPCPolicy):
                 policy.reset()
 
-            if isinstance(Policy, TeleopPolicy):
+            if isinstance(policy, TeleopPolicy):
+                # Returns (seq, batch, action_dim)
                 action_sequence = policy.run_inference(observation)
             else:
+                # Returns (seq, batch, action_dim)
                 action_sequence = policy_rollout_wrapper.provide_observation_get_actions(
                     observation,
                     observation_timestamp=start_step_time,
