@@ -42,6 +42,12 @@ I'll highlight the main changes and additions relative to the main LeRobot fork.
 - `lerobot/scripts/create_goal_masks.py`: Used to draw the goal regions for the cube.
 - `lerobot/scripts/teleop_with_goals.py`: Teleop the robot and visualize the reward.
 
+## Additional development environment setup
+
+`pip install inputs`
+
+`conda install conda-forge::open3d`
+
 ## Specific resources (about this task)
 
 Here are some quick tutorials on some of the steps we'll need to do to set up and run our experiments.
