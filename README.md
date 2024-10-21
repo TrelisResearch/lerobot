@@ -48,6 +48,8 @@ I'll highlight the main changes and additions relative to the main LeRobot fork.
 
 `conda install conda-forge::open3d`
 
+`pip uninstall opencv-python && conda install -c conda-forge opencv=4.10.0`
+
 ## Specific resources (about this task)
 
 Here are some quick tutorials on some of the steps we'll need to do to set up and run our experiments.
