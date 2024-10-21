@@ -89,7 +89,7 @@ if __name__ == "__main__":
         dataset_dir, fps=robot_cfg.cameras.main.fps, image_mode=LeRobotDatasetV2ImageMode.VIDEO
     )
     episode_ix = 0 if len(dataset) == 0 else dataset.get_unique_episode_indices().max() + 1
-    policy_cfg = init_hydra_config("lerobot/configs/policy/tdmpc_koch.yaml")
+    policy_cfg = init_hydra_config("lerobot/configs/policy/tdmpc_real.yaml")
     while True:
         if episode_ix >= args.num_episodes:
             break

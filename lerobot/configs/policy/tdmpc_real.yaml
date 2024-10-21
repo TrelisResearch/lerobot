@@ -1,0 +1,141 @@
+# @package _global_
+
+seed: 1
+dataset_repo_id: push_cube
+
+override_dataset_stats:
+  observation.images.main:
+    # stats from imagenet, since we use a pretrained vision model
+    mean: [[[0.485]], [[0.456]], [[0.406]]]  # (c,1,1)
+    std: [[[0.229]], [[0.224]], [[0.225]]]  # (c,1,1)
+  action:
+    min: [-5, -8, -10, -10, -12, -5]
+    max: [5, 8, 10, 10, 12, 5]
+
+training:
+  offline_steps: 100
+
+  # Offline training dataloader
+  num_workers: 12
+
+  batch_size: 256
+  grad_clip_norm: 10.0
+  lr: 3e-4
+
+  eval_freq: -1
+  log_freq: 500
+  save_freq: 50000
+
+  online_steps: 1000000
+  online_rollout_n_episodes: 1
+  online_rollout_batch_size: 1
+  # online_steps_between_rollouts: 1000
+  online_update_to_data_ratio: 1
+  online_sampling_ratio: 1.0
+  online_env_seed: 10000
+  online_buffer_capacity: 10000
+  online_buffer_seed_size: 0
+  do_online_rollout_async: false
+
+  delta_timestamps:
+    observation.images.main: "[i / ${fps} for i in range(${policy.horizon} + 1)]"
+    observation.state: "[i / ${fps} for i in range(${policy.horizon} + 1)]"
+    action: "[i / ${fps} for i in range(${policy.horizon})]"
+    next.reward: "[i / ${fps} for i in range(${policy.horizon})]"
+
+  drop_n_last_frames: 5  # ${policy.horizon}
+
+  image_transforms:
+  # These transforms are all using standard torchvision.transforms.v2
+  # You can find out qhow these transformations affect images here:
+  # https://pytorch.org/vision/0.18/auto_examples/transforms/plot_transforms_illustrations.html
+  # We use a custom RandomSubsetApply container to sample them.
+  # For each transform, the following parameters are available:
+  #   weight: This represents the multinomial probability (with no replacement)
+  #           used for sampling the transform. If the sum of the weights is not 1,
+  #           they will be normalized.
+  #   min_max: Lower & upper bound respectively used for sampling the transform's parameter
+  #           (following uniform distribution) when it's applied.
+    # Set this flag to `true` to enable transforms during training
+    enable: true
+    # This is the maximum number of transforms (sampled from these below) that will be applied to each frame.
+    # It's an integer in the interval [1, number of available transforms].
+    max_num_transforms: 3
+    # By default, transforms are applied in Torchvision's suggested order (shown below).
+    # Set this to True to apply them in a random order.
+    random_order: false
+    brightness:
+      weight: 1
+      min_max: [0.8, 1.2]
+    contrast:
+      weight: 1
+      min_max: [0.8, 1.2]
+    saturation:
+      weight: 1
+      min_max: [0.7, 1.3]
+    hue:
+      weight: 1
+      min_max: [-0.05, 0.05]
+    sharpness:
+      weight: 1
+      min_max: [0.8, 1.2]
+
+policy:
+  name: tdmpc
+
+  pretrained_model_path: null
+
+  # Input / output structure.
+  n_action_repeats: 1
+  horizon: 5
+  n_action_steps: 1
+
+  input_shapes:
+    # TODO(rcadene, alexander-soare): add variables for height and width from the dataset/env?
+    observation.images.main: [3, 66, 88]
+    observation.state: ["${env.state_dim}"]
+  output_shapes:
+    action: ["${env.action_dim}"]
+
+  # Normalization / Unnormalization
+  input_normalization_modes:
+    observation.images.main: mean_std
+    observation.state: min_max
+  # Hack, normalizing in the buffer instead to [-15, 15].
+  output_normalization_modes:
+    action: min_max
+
+  # Architecture / modeling.
+  # Neural networks.
+  image_encoder_hidden_dim: 32
+  state_encoder_hidden_dim: 256
+  latent_dim: 50
+  q_ensemble_size: 5
+  mlp_dim: 512
+  # Reinforcement learning.
+  discount: 0.9
+
+  # Inference.
+  use_mpc: true
+  cem_iterations: 6
+  max_std: 2.0
+  min_std: 0.05
+  n_gaussian_samples: 512
+  n_pi_samples: 51
+  uncertainty_regularizer_coeff: 1.0
+  n_elites: 50
+  elite_weighting_temperature: 0.5
+  gaussian_mean_momentum: 0.1
+
+  # Training and loss computation.
+  max_random_shift_ratio: 0
+  # Loss coefficients.
+  reward_coeff: 0.05  # 0.5
+  expectile_weight: 0.9
+  value_coeff: 0.01  # 0.1
+  consistency_coeff: 20.0
+  advantage_scaling: 3.0
+  pi_coeff: 0.5
+  temporal_decay_coeff: 0.5
+  # Target model.
+  target_model_momentum: 0.995
