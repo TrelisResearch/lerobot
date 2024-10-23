@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     dataset_dir = Path(args.dataset_dir)
     robot_cfg = init_hydra_config("lerobot/configs/robot/koch_.yaml")
-    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/koch_.yaml"))
+    robot: ManipulatorRobot = make_robot(robot_cfg)
     robot.connect()
     if dataset_dir.exists():
         if args.overwrite_dataset:
