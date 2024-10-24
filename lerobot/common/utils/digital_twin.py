@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import open3d as o3d
 
-from lerobot.common.kinematics import KochKinematics
+from lerobot.common.kinematics import RobotKinematics
 
 GREEN = np.array([0.5, 1.0, 0.5])
 BLUE = np.array([0.0, 0.0, 1.0])
@@ -170,17 +170,17 @@ class DigitalTwin:
 
     def set_twin_pose(self, follower_pos, follower_pos_trajectory=None):
         # follower_pos *= 0
-        self.set_object_pose(self.base, KochKinematics.fk_base())
+        self.set_object_pose(self.base, RobotKinematics.fk_base())
         self.vis.update_geometry(self.base)
-        self.set_object_pose(self.shoulder, KochKinematics.fk_shoulder(follower_pos))
+        self.set_object_pose(self.shoulder, RobotKinematics.fk_shoulder(follower_pos))
         self.vis.update_geometry(self.shoulder)
-        self.set_object_pose(self.humerus, KochKinematics.fk_humerus(follower_pos))
+        self.set_object_pose(self.humerus, RobotKinematics.fk_humerus(follower_pos))
         self.vis.update_geometry(self.humerus)
-        self.set_object_pose(self.forearm, KochKinematics.fk_forearm(follower_pos))
+        self.set_object_pose(self.forearm, RobotKinematics.fk_forearm(follower_pos))
         self.vis.update_geometry(self.forearm)
-        self.set_object_pose(self.wrist, KochKinematics.fk_wrist(follower_pos))
+        self.set_object_pose(self.wrist, RobotKinematics.fk_wrist(follower_pos))
         self.vis.update_geometry(self.wrist)
-        self.set_object_pose(self.gripper, KochKinematics.fk_gripper(follower_pos))
+        self.set_object_pose(self.gripper, RobotKinematics.fk_gripper(follower_pos))
         # self.gripper.paint_uniform_color(
         #     np.clip((1 - follower_pos[-1] / 50) * RED + (follower_pos[-1] / 50) * GREEN, 0, 1)
         # )
@@ -206,7 +206,7 @@ class DigitalTwin:
         for i, (waypoint, follower_pos) in enumerate(
             zip(self.waypoints, follower_pos_trajectory, strict=False)
         ):
-            pos = KochKinematics.fk_gripper(follower_pos)[:3, 3]
+            pos = RobotKinematics.fk_gripper(follower_pos)[:3, 3]
             waypoint.translate(pos, relative=False)
             self.vis.update_geometry(waypoint)
             waypoint.paint_uniform_color(

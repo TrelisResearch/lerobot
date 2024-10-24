@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import torch
 
-from lerobot.common.kinematics import KochKinematics
+from lerobot.common.kinematics import RobotKinematics
 from lerobot.common.robot_devices.motors.dynamixel import TorqueMode
 from lerobot.common.robot_devices.robots.manipulator import ManipulatorRobot
 from lerobot.common.robot_devices.utils import busy_wait
@@ -76,7 +76,7 @@ def calc_reward_cube_push(
 
     do_terminate = False
 
-    gripper_tip_pos = KochKinematics.fk_gripper_tip(current_joint_pos)[:3, -1]
+    gripper_tip_pos = RobotKinematics.fk_gripper_tip(current_joint_pos)[:3, -1]
     if not is_in_bounds(gripper_tip_pos):
         do_terminate = True
         reward += oob_reward
@@ -113,7 +113,7 @@ def calc_reward_joint_goal(
 
     do_terminate = False
 
-    gripper_tip_pos = KochKinematics.fk_gripper_tip(current_joint_pos)[:3, -1]
+    gripper_tip_pos = RobotKinematics.fk_gripper_tip(current_joint_pos)[:3, -1]
     if not is_in_bounds(gripper_tip_pos):
         reward -= 5
         do_terminate = True
@@ -152,7 +152,7 @@ def reset_for_joint_pos(robot: ManipulatorRobot):
         reset_pos[3] = np.random.uniform(45, 90)
         reset_pos[4] = np.random.uniform(-50, 50)
         reset_pos[5] = np.random.uniform(0, 90)
-        if is_in_bounds(KochKinematics.fk_gripper_tip(reset_pos)[:3, -1], buffer=0.02):
+        if is_in_bounds(RobotKinematics.fk_gripper_tip(reset_pos)[:3, -1], buffer=0.02):
             break
     reset_pos = torch.from_numpy(reset_pos)
     _go_to_pos(robot, reset_pos)
@@ -173,7 +173,7 @@ def reset_for_cube_push(robot: ManipulatorRobot, right=True):
             ]
         ).float()
         if is_in_bounds(
-            KochKinematics.fk_gripper_tip(reset_pos.numpy())[:3, -1],
+            RobotKinematics.fk_gripper_tip(reset_pos.numpy())[:3, -1],
             buffer=np.array([[0.02, 0.02], [0.02, 0.02], [0.02, 0.01]]),
         ):
             break

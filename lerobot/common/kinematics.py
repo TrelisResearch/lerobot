@@ -72,7 +72,37 @@ def se3_error(target_pose, current_pose):
     return np.concatenate([pos_error, rot_error])
 
 
-class KochKinematics:
+class RobotKinematics:
+    # Measurements for the Koch robot.
+    measurements = {
+        "gripper": [0.239, -0.001, 0.024],
+        "wrist": [0.209, 0, 0.024],
+        "forearm": [0.108, 0, 0.02],
+        "humerus": [0, 0, 0.036],
+        "shoulder": [0, 0, 0],
+        "base": [0, 0, 0.02],
+    }
+
+    # Measurements for the SO-100 robot.
+    # measurements = {
+    #     "gripper": [0.320, 0, 0.050],
+    #     "wrist": [0.278, 0, 0.050],
+    #     "forearm": [0.143, 0, 0.044],
+    #     "humerus": [0.031, 0, 0.072],
+    #     "shoulder": [0, 0, 0],
+    #     "base": [0, 0, 0.02],  # ?
+    # }
+
+    # Measurements for the Moss V1.0
+    # measurements = {
+    #     "gripper": [0.292, 0.022, 0.064],
+    #     "wrist": [0.245, 0.002, 0.064],
+    #     "forearm": [0.122, 0, 0.064],
+    #     "humerus": [0.001, 0.001, 0.063],
+    #     "shoulder": [0, 0, 0],
+    #     "base": [0, 0, 0.02],  # ?
+    # }
+
     gripper_X0 = np.array(
         [
             [1, 0, 0, 0],
@@ -82,7 +112,7 @@ class KochKinematics:
         ]
     )
     # Screw axis of gripper frame wrt base frame.
-    S_BG = np.array([1, 0, 0, 0, 0.024, 0.001])
+    S_BG = np.array([1, 0, 0, 0, measurements["gripper"][2], -measurements["gripper"][1]])
     # Gripper origin to centroid transform.
     X_GoGc = np.array(
         [
@@ -104,9 +134,9 @@ class KochKinematics:
     # 0-position gripper frame pose wrt base.
     X_BoGo = np.array(
         [
-            [1, 0, 0, 0.239],
-            [0, 1, 0, -0.001],
-            [0, 0, 1, 0.024],
+            [1, 0, 0, measurements["gripper"][0]],
+            [0, 1, 0, measurements["gripper"][1]],
+            [0, 0, 1, measurements["gripper"][2]],
             [0, 0, 0, 1],
         ]
     )
@@ -122,7 +152,7 @@ class KochKinematics:
     )
 
     # Screw axis of wrist frame wrt base frame.
-    S_BR = np.array([0, 1, 0, -0.024, 0, 0.209])
+    S_BR = np.array([0, 1, 0, -measurements["wrist"][2], 0, measurements["wrist"][0]])
     # 0-position origin to centroid transform.
     X_RoRc = np.array(
         [
@@ -135,15 +165,15 @@ class KochKinematics:
     # 0-position wrist frame pose wrt base.
     X_BR = np.array(
         [
-            [1, 0, 0, 0.209],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.024],
+            [1, 0, 0, measurements["wrist"][0]],
+            [0, 1, 0, measurements["wrist"][1]],
+            [0, 0, 1, measurements["wrist"][2]],
             [0, 0, 0, 1],
         ]
     )
 
     # Screw axis of forearm frame wrt base frame.
-    S_BF = np.array([0, 1, 0, -0.020, 0, 0.108])
+    S_BF = np.array([0, 1, 0, -measurements["forearm"][2], 0, measurements["forearm"][0]])
     # Forearm origin + centroid transform.
     X_FoFc = np.array(
         [
@@ -156,15 +186,15 @@ class KochKinematics:
     # 0-position forearm frame pose wrt base.
     X_BF = np.array(
         [
-            [1, 0, 0, 0.108],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.020],
+            [1, 0, 0, measurements["forearm"][0]],
+            [0, 1, 0, measurements["forearm"][1]],
+            [0, 0, 1, measurements["forearm"][2]],
             [0, 0, 0, 1],
         ]
     )
 
     # Screw axis of humerus frame wrt base frame.
-    S_BH = np.array([0, -1, 0, 0.036, 0, 0])
+    S_BH = np.array([0, -1, 0, measurements["humerus"][2], 0, -measurements["humerus"][0]])
     # Humerus origin to centroid transform.
     X_HoHc = np.array(
         [
@@ -177,9 +207,9 @@ class KochKinematics:
     # 0-position humerus frame pose wrt base.
     X_BH = np.array(
         [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.036],
+            [1, 0, 0, measurements["humerus"][0]],
+            [0, 1, 0, measurements["humerus"][1]],
+            [0, 0, 1, measurements["humerus"][2]],
             [0, 0, 0, 1],
         ]
     )
@@ -196,9 +226,9 @@ class KochKinematics:
     )
     X_BS = np.array(
         [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.0],
+            [1, 0, 0, measurements["shoulder"][0]],
+            [0, 1, 0, measurements["shoulder"][1]],
+            [0, 0, 1, measurements["shoulder"][2]],
             [0, 0, 0, 1],
         ]
     )
@@ -222,9 +252,9 @@ class KochKinematics:
     )
     X_WoBo = np.array(
         [
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.02],
+            [1, 0, 0, measurements["base"][0]],
+            [0, 1, 0, measurements["base"][1]],
+            [0, 0, 1, measurements["base"][2]],
             [0, 0, 0, 1],
         ]
     )
@@ -233,81 +263,81 @@ class KochKinematics:
 
     @staticmethod
     def fk_base():
-        return KochKinematics.X_WoBo @ KochKinematics.X_BoBc @ KochKinematics.base_X0
+        return RobotKinematics.X_WoBo @ RobotKinematics.X_BoBc @ RobotKinematics.base_X0
 
     @staticmethod
     def fk_shoulder(robot_pos_deg):
         robot_pos_rad = robot_pos_deg / 180 * np.pi
         return (
-            KochKinematics.X_WoBo
-            @ screw_axis_to_transform(KochKinematics.S_BS, robot_pos_rad[0])
-            @ KochKinematics.X_SoSc
-            @ KochKinematics.X_BS
+            RobotKinematics.X_WoBo
+            @ screw_axis_to_transform(RobotKinematics.S_BS, robot_pos_rad[0])
+            @ RobotKinematics.X_SoSc
+            @ RobotKinematics.X_BS
         )
 
     @staticmethod
     def fk_humerus(robot_pos_deg):
         robot_pos_rad = robot_pos_deg / 180 * np.pi
         return (
-            KochKinematics.X_WoBo
-            @ screw_axis_to_transform(KochKinematics.S_BS, robot_pos_rad[0])
-            @ screw_axis_to_transform(KochKinematics.S_BH, robot_pos_rad[1])
-            @ KochKinematics.X_HoHc
-            @ KochKinematics.X_BH
+            RobotKinematics.X_WoBo
+            @ screw_axis_to_transform(RobotKinematics.S_BS, robot_pos_rad[0])
+            @ screw_axis_to_transform(RobotKinematics.S_BH, robot_pos_rad[1])
+            @ RobotKinematics.X_HoHc
+            @ RobotKinematics.X_BH
         )
 
     @staticmethod
     def fk_forearm(robot_pos_deg):
         robot_pos_rad = robot_pos_deg / 180 * np.pi
         return (
-            KochKinematics.X_WoBo
-            @ screw_axis_to_transform(KochKinematics.S_BS, robot_pos_rad[0])
-            @ screw_axis_to_transform(KochKinematics.S_BH, robot_pos_rad[1])
-            @ screw_axis_to_transform(KochKinematics.S_BF, robot_pos_rad[2])
-            @ KochKinematics.X_FoFc
-            @ KochKinematics.X_BF
+            RobotKinematics.X_WoBo
+            @ screw_axis_to_transform(RobotKinematics.S_BS, robot_pos_rad[0])
+            @ screw_axis_to_transform(RobotKinematics.S_BH, robot_pos_rad[1])
+            @ screw_axis_to_transform(RobotKinematics.S_BF, robot_pos_rad[2])
+            @ RobotKinematics.X_FoFc
+            @ RobotKinematics.X_BF
         )
 
     @staticmethod
     def fk_wrist(robot_pos_deg):
         robot_pos_rad = robot_pos_deg / 180 * np.pi
         return (
-            KochKinematics.X_WoBo
-            @ screw_axis_to_transform(KochKinematics.S_BS, robot_pos_rad[0])
-            @ screw_axis_to_transform(KochKinematics.S_BH, robot_pos_rad[1])
-            @ screw_axis_to_transform(KochKinematics.S_BF, robot_pos_rad[2])
-            @ screw_axis_to_transform(KochKinematics.S_BR, robot_pos_rad[3])
-            @ KochKinematics.X_RoRc
-            @ KochKinematics.X_BR
-            @ KochKinematics.wrist_X0
+            RobotKinematics.X_WoBo
+            @ screw_axis_to_transform(RobotKinematics.S_BS, robot_pos_rad[0])
+            @ screw_axis_to_transform(RobotKinematics.S_BH, robot_pos_rad[1])
+            @ screw_axis_to_transform(RobotKinematics.S_BF, robot_pos_rad[2])
+            @ screw_axis_to_transform(RobotKinematics.S_BR, robot_pos_rad[3])
+            @ RobotKinematics.X_RoRc
+            @ RobotKinematics.X_BR
+            @ RobotKinematics.wrist_X0
         )
 
     @staticmethod
     def fk_gripper(robot_pos_deg):
         robot_pos_rad = robot_pos_deg / 180 * np.pi
         return (
-            KochKinematics.X_WoBo
-            @ screw_axis_to_transform(KochKinematics.S_BS, robot_pos_rad[0])
-            @ screw_axis_to_transform(KochKinematics.S_BH, robot_pos_rad[1])
-            @ screw_axis_to_transform(KochKinematics.S_BF, robot_pos_rad[2])
-            @ screw_axis_to_transform(KochKinematics.S_BR, robot_pos_rad[3])
-            @ screw_axis_to_transform(KochKinematics.S_BG, robot_pos_rad[4])
-            @ KochKinematics._fk_gripper_post
+            RobotKinematics.X_WoBo
+            @ screw_axis_to_transform(RobotKinematics.S_BS, robot_pos_rad[0])
+            @ screw_axis_to_transform(RobotKinematics.S_BH, robot_pos_rad[1])
+            @ screw_axis_to_transform(RobotKinematics.S_BF, robot_pos_rad[2])
+            @ screw_axis_to_transform(RobotKinematics.S_BR, robot_pos_rad[3])
+            @ screw_axis_to_transform(RobotKinematics.S_BG, robot_pos_rad[4])
+            @ RobotKinematics._fk_gripper_post
         )
 
     @staticmethod
     def fk_gripper_tip(robot_pos_deg):
         robot_pos_rad = robot_pos_deg / 180 * np.pi
         return (
-            KochKinematics.X_WoBo
-            @ screw_axis_to_transform(KochKinematics.S_BS, robot_pos_rad[0])
-            @ screw_axis_to_transform(KochKinematics.S_BH, robot_pos_rad[1])
-            @ screw_axis_to_transform(KochKinematics.S_BF, robot_pos_rad[2])
-            @ screw_axis_to_transform(KochKinematics.S_BR, robot_pos_rad[3])
-            @ screw_axis_to_transform(KochKinematics.S_BG, robot_pos_rad[4])
-            @ KochKinematics.X_GoGt
-            @ KochKinematics.X_BoGo
-            @ KochKinematics.gripper_X0
+            RobotKinematics.X_WoBo
+            @ screw_axis_to_transform(RobotKinematics.S_BS, robot_pos_rad[0])
+            @ screw_axis_to_transform(RobotKinematics.S_BH, robot_pos_rad[1])
+            @ screw_axis_to_transform(RobotKinematics.S_BF, robot_pos_rad[2])
+            @ screw_axis_to_transform(RobotKinematics.S_BR, robot_pos_rad[3])
+            @ screw_axis_to_transform(RobotKinematics.S_BG, robot_pos_rad[4])
+            @ RobotKinematics.X_GoGt
+            @ RobotKinematics.X_BoGo
+            @ RobotKinematics.gripper_X0
         )
 
     @staticmethod
@@ -324,8 +354,8 @@ class KochKinematics:
             delta[el_ix] = eps / 2
             Sdot = (
                 pose_difference_se3(
-                    KochKinematics.fk_gripper(robot_pos_deg[:-1] + delta),
-                    KochKinematics.fk_gripper(robot_pos_deg[:-1] - delta),
+                    RobotKinematics.fk_gripper(robot_pos_deg[:-1] + delta),
+                    RobotKinematics.fk_gripper(robot_pos_deg[:-1] - delta),
                 )
                 / eps
             )
@@ -345,8 +375,8 @@ class KochKinematics:
             delta *= 0
             delta[el_ix] = eps / 2
             Sdot = (
-                KochKinematics.fk_gripper(robot_pos_deg[:-1] + delta)[:3, 3]
-                - KochKinematics.fk_gripper(robot_pos_deg[:-1] - delta)[:3, 3]
+                RobotKinematics.fk_gripper(robot_pos_deg[:-1] + delta)[:3, 3]
+                - RobotKinematics.fk_gripper(robot_pos_deg[:-1] - delta)[:3, 3]
             ) / eps
             jac[:, el_ix] = Sdot
         return jac
@@ -357,13 +387,13 @@ class KochKinematics:
         max_iterations = 5
         learning_rate = 1
         for _ in range(max_iterations):
-            current_ee_pose = KochKinematics.fk_gripper(current_joint_state)
+            current_ee_pose = RobotKinematics.fk_gripper(current_joint_state)
             if not position_only:
                 error = se3_error(desired_ee_pose, current_ee_pose)
-                jac = KochKinematics.jac_gripper(current_joint_state)
+                jac = RobotKinematics.jac_gripper(current_joint_state)
             else:
                 error = desired_ee_pose[:3, 3] - current_ee_pose[:3, 3]
-                jac = KochKinematics.pos_jac_gripper(current_joint_state)
+                jac = RobotKinematics.pos_jac_gripper(current_joint_state)
             delta_angles = np.linalg.pinv(jac) @ error
             current_joint_state[:-1] += learning_rate * delta_angles
 

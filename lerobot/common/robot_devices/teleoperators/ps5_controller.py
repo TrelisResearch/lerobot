@@ -6,7 +6,7 @@ import time
 import inputs
 import numpy as np
 
-from lerobot.common.kinematics import KochKinematics
+from lerobot.common.kinematics import RobotKinematics
 
 EE_SENSITIVITY = 5e-5
 JOINT_SENSITIVITY = 0.04
@@ -87,7 +87,7 @@ class PS5Controller:
         ):
             return None
 
-        current_ee_pose = KochKinematics.fk_gripper(reference_joint_state)
+        current_ee_pose = RobotKinematics.fk_gripper(reference_joint_state)
 
         # Compute IK
         if left_right != 0 or forward_backward != 0 or up != 0 or down != 0:
@@ -102,7 +102,7 @@ class PS5Controller:
                 )
                 @ current_ee_pose
             )
-            target_joint_state = KochKinematics.ik(
+            target_joint_state = RobotKinematics.ik(
                 reference_joint_state, desired_ee_pose, position_only=left_right != 0
             )
             if target_joint_state is None:
