@@ -1,3 +1,13 @@
+"""
+For the LeRobot Hackathon.
+
+Adaptation of eval.py (from the main branch). Main changes:
+- Uses a real robot for rollout rather than a simulation.
+- Adds teleoperation capability. This lets us record a dataset with the same code that is used to record online
+  rollouts.
+- Parts of the code are specific to the RL task we will be working with.
+"""
+
 import argparse
 import json
 import logging
@@ -80,12 +90,22 @@ def rollout(
     manual_reset: bool = False,
     goal: str | None = None,
 ) -> dict:
+    """
+    Run the policy on the robot for one episode and record the episode along the way so it can be added to
+    the online data buffer of the training loop.
+    """
+
+    # TASK SPECIFIC. Get the left and right goal masks, and the "in-bounds" mask.
     goal_setter_left = GoalSetter.from_mask_file("outputs/goal_mask_left.npy")
     goal_setter_right = GoalSetter.from_mask_file("outputs/goal_mask_right.npy")
+    # This is called "center" but I really mean "in-bounds".
     in_bounds_mask = GoalSetter.from_mask_file("outputs/goal_mask_center.npy").get_goal_mask()
     goal_mask_left = goal_setter_left.get_goal_mask()
     goal_mask_right = goal_setter_right.get_goal_mask()
 
+    # TASK SPECIFIC. Use the reward function to determine if the cube is already sitting on one of the goal
+    # regions, then set the goal to be the other region. Note though, that if `goal` is provided in the kwargs
+    # we go with that rather than this automated approach.
     observation: dict[str, torch.Tensor] = robot.capture_observation()
     reward_left, *_ = calc_reward_cube_push(
         img=observation["observation.images.main"].numpy(),
@@ -128,6 +148,8 @@ def rollout(
         else:
             raise ValueError
 
+    # TASK SPECIFIC: Reset the environment, either manually with teleop (for dataset recording) or
+    # autonomously (for online rollouts).
     if manual_reset:
         msg = f"Going {goal}. Reset the environment and robot. Press return in the terminal when ready."
         say(msg)
@@ -144,8 +166,7 @@ def rollout(
         say(f"Go {goal}")
         reset_for_cube_push(robot, right=start_pos == "right")
 
-    # say(f"Go {goal}", blocking=True)
-
+    # TASK SPECIFIC: Check if the cube is out of bounds, and ask for help until it's placed back in bounds.
     while True:
         observation: dict[str, torch.Tensor] = robot.capture_observation()
         cube_mask, _ = segment_hsv(observation["observation.images.main"].numpy())
@@ -154,16 +175,19 @@ def rollout(
         say("Cube is out of bounds! Help.")
         time.sleep(5)
 
+    # Preparing a bunch of stuff for the rollout loop.
     where_goal = torch.where(torch.from_numpy(goal_mask) > 0)
 
     if visualize_3d:
         digital_twin = DigitalTwin()
+
     assert isinstance(policy, nn.Module), "Policy must be a PyTorch nn module."
     device = get_device_from_parameters(policy)
-    policy_rollout_wrapper = PolicyRolloutWrapper(policy, fps=fps, n_action_buffer=n_action_buffer)
 
+    policy_rollout_wrapper = PolicyRolloutWrapper(policy, fps=fps, n_action_buffer=n_action_buffer)
     policy_rollout_wrapper.reset()
 
+    # This is the data structure the episode will be "recorded" into.
     episode_data = defaultdict(list)
 
     if enable_intevention:
@@ -183,19 +207,21 @@ def rollout(
     def to_relative_time(t):
         return t - start_time
 
+    # MAIN ROLLOUT LOOP.
     while True:
-        is_dropped_cycle = False
         over_time = False
         start_step_time = to_relative_time(time.perf_counter())
         is_warmup = start_step_time <= warmup_s
         observation: dict[str, torch.Tensor] = robot.capture_observation()
-
         annotated_img = None
+
+        # Update the episode data for this frame with indices, the observation, and the reward.
         if not is_warmup:
             episode_data[LeRobotDatasetV2.INDEX_KEY].append(step)
             episode_data[LeRobotDatasetV2.EPISODE_INDEX_KEY].append(0)
             episode_data[LeRobotDatasetV2.TIMESTAMP_KEY].append(start_step_time)
             episode_data[LeRobotDatasetV2.FRAME_INDEX_KEY].append(step)
+
             for k in observation:
                 if k.startswith("observation.image"):
                     img = observation[k].numpy().copy()
@@ -205,6 +231,8 @@ def rollout(
                 else:
                     episode_data[k].append(observation[k].numpy())
 
+            # All data keys that start with "next." get appended to the episode data starting from step 1
+            # That way they are offset by 1 relative to keys not starting with "next.".
             if step > 0:
                 if len(episode_data["action"]) >= 2:
                     prior_action = episode_data["action"][-2]
@@ -225,21 +253,27 @@ def rollout(
 
         if annotated_img is None:
             annotated_img = observation["observation.images.main"].numpy()
-
+        # Draw the goal mask on the annotated image for visualization.
         annotated_img[where_goal] = annotated_img[where_goal] // 2 + np.array([127, 127, 127])
 
+        # Get the follower arms position. This will be used later to convert the policy's output action from
+        # relative space to absolute space.
         follower_pos = observation["observation.state"].numpy()
         if first_follower_pos is None:
             first_follower_pos = follower_pos.copy()
 
+        # Just a debug check to make sure that everything we've done so far in this loop iteration didn't
+        # take too long. You shouldn't see this warning come up.
         elapsed = to_relative_time(time.perf_counter()) - start_step_time
         if elapsed > period:
             over_time = True
             logging.warning(f"Over time after capturing observation! {elapsed=}")
 
-        # Convert to pytorch format: channel first and float32 in [0,1] with batch dimension
+        # Convert to pytorch format: channel first and float32 in [0,1] with batch dimension.
         for name in observation:
             if name.startswith("observation.image"):
+                # Small side mission: While we are looping through the image observations, also set up the
+                # visualization image.
                 if visualize_img:
                     to_visualize[name] = annotated_img
                     to_visualize[name] = cv2.resize(to_visualize[name], (640, 480))
@@ -261,9 +295,11 @@ def rollout(
             observation[name] = observation[name].unsqueeze(0)
             observation[name] = observation[name].to(device)
 
-        # Compute the next action with the policy
-        # based on the current observation
+        # Compute the action with the policy based on the current observation.
         with torch.inference_mode():
+            # We don't want to take any longer than this to return a result as then we'd be falling behind the
+            # control loop.
+            # HACK. subtract 0.025 for a buffer. Careful about this if changing the FPS.
             timeout = (
                 period - (to_relative_time(time.perf_counter()) - start_step_time) - 0.025
                 if step > 0
@@ -274,6 +310,7 @@ def rollout(
             if isinstance(policy, TDMPCPolicy):
                 policy.reset()
 
+            # If we're doing teleop don't use the rollout wrapper.
             if isinstance(policy, TeleopPolicy):
                 # Returns (seq, batch, action_dim)
                 action_sequence = policy.run_inference(observation)
@@ -296,12 +333,6 @@ def rollout(
 
         if visualize_img:
             for name in to_visualize:
-                if is_dropped_cycle:
-                    red = np.array([255, 0, 0], dtype=np.uint8)
-                    to_visualize[name][:10] = red
-                    to_visualize[name][-10:] = red
-                    to_visualize[name][:, :10] = red
-                    to_visualize[name][:, -10:] = red
                 if over_time:
                     purple = np.array([255, 0, 255], dtype=np.uint8)
                     to_visualize[name][:20] = purple
@@ -333,6 +364,7 @@ def rollout(
             robot.send_action(absolute_action)
             logging.info("Warming up.")
         else:
+            # Special logic for using a ps5 controller to intervene.
             if enable_intevention:
                 ps5_reference_joint_pos = (
                     prior_absolute_action.numpy() if prior_absolute_action is not None else first_follower_pos
@@ -365,8 +397,10 @@ def rollout(
             else:
                 episode_data["action"].append(absolute_action.numpy())
 
+        # Track the prior absolute action for calculating the reward.
         prior_absolute_action = absolute_action.clone()
 
+        # Wait as long as is needed to complete the control loop.
         elapsed = to_relative_time(time.perf_counter()) - start_step_time
         if elapsed > period:
             logging.warning(colored(f"Step took too long! {elapsed=}", "yellow"))
@@ -378,12 +412,14 @@ def rollout(
 
         if not is_warmup:
             step += 1
+    # ^ Finish rollout loop.
 
     # Pad the "next" keys with a copy of the last one. They should not be accessed anyway.
     for k in episode_data:
         if k.startswith("next."):
             episode_data[k].append(episode_data[k][-1])
 
+    # Convert to float32 where needed.
     for k in episode_data:
         episode_data[k] = np.stack(episode_data[k])
         if k in ["action", "observation.state", "next.reward", LeRobotDatasetV2.TIMESTAMP_KEY]:
@@ -448,6 +484,10 @@ def eval_policy(
     visualize_3d: bool = False,
     enable_progbar: bool = False,
 ) -> dict:
+    """
+    Nothing fancy happening here. Runs `rollout` for `n_episodes` iterations and concatenates all of the
+    recorded episode data. Also computes eval metrics for reporting.
+    """
     assert isinstance(policy, nn.Module)
     policy.eval()
 
