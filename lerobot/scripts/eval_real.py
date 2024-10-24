@@ -148,7 +148,7 @@ def rollout(
         else:
             raise ValueError
 
-    # TASK SPECIFIC: Reset the environment, either manually with teleop (for dataset recording) or
+    # TASK SPECIFIC: Reset the robot position, either manually with teleop (for dataset recording) or
     # autonomously (for online rollouts).
     if manual_reset:
         msg = f"Going {goal}. Reset the environment and robot. Press return in the terminal when ready."

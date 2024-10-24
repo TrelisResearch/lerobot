@@ -54,6 +54,8 @@ I'll highlight the main changes and additions relative to the main LeRobot fork.
 
 Here are some quick tutorials on some of the steps we'll need to do to set up and run our experiments.
 
+A walk through of the code: https://youtu.be/2crxpBojS04
+
 Goal mask creation: https://youtu.be/EXv4F3_cjBA
 
 Verifying the goal mask: https://youtu.be/ugY9WlYZNp0
@@ -67,6 +69,7 @@ Basics of recording a dataset: https://youtu.be/R9PsRLHPQPk
 How the policy outputs are scaled: https://youtu.be/t1T0RoY9syg
 
 Getting started with training: https://youtu.be/NNP4pIjHZqM
+
 
 ## General resources (about TD-MPC)
 
