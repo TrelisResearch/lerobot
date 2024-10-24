@@ -77,3 +77,4 @@ You can look into the TD-MPC family:
 - [LeRobot Tech Talk by Nicklas Hansen (first author TD-MPC)](https://www.youtube.com/watch?v=5d9W0I2mpNg)
 - My own video with a deep dive explanation of how TD-MPC works.
   - [Part 1: Rollout with MPC](https://youtu.be/--hDN4LLmPI)
+  - [Part 2: Training](https://youtu.be/_CKJJRAlvKI)
