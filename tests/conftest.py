@@ -18,10 +18,11 @@ import traceback
 
 import cv2
 import pytest
+from serial import SerialException
 
+from lerobot import available_robots
 from lerobot.common.utils.utils import init_hydra_config
-
-from .utils import DEVICE, ROBOT_CONFIG_PATH_TEMPLATE
+from tests.utils import DEVICE, ROBOT_CONFIG_PATH_TEMPLATE
 
 
 def pytest_collection_finish():
@@ -30,6 +31,11 @@ def pytest_collection_finish():
 
 @pytest.fixture
 def is_robot_available(robot_type):
+    if robot_type not in available_robots:
+        raise ValueError(
+            f"The robot type '{robot_type}' is not valid. Expected one of these '{available_robots}"
+        )
+
     try:
         from lerobot.common.robot_devices.robots.factory import make_robot
 
@@ -39,9 +45,17 @@ def is_robot_available(robot_type):
         robot.connect()
         del robot
         return True
-    except Exception:
-        traceback.print_exc()
+
+    except Exception as e:
         print(f"\nA {robot_type} robot is not available.")
+
+        if isinstance(e, ModuleNotFoundError):
+            print(f"\nInstall module '{e.name}'")
+        elif isinstance(e, SerialException):
+            print("\nNo physical motors bus detected.")
+        else:
+            traceback.print_exc()
+
         return False
 
 

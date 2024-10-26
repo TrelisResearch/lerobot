@@ -13,12 +13,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 import platform
 from functools import wraps
 
 import pytest
 import torch
 
+from lerobot import available_cameras, available_motors, available_robots
 from lerobot.common.utils.import_utils import is_package_available
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -27,6 +29,42 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DEFAULT_CONFIG_PATH = "lerobot/configs/default.yaml"
 
 ROBOT_CONFIG_PATH_TEMPLATE = "lerobot/configs/robot/{robot}.yaml"
+
+TEST_ROBOT_TYPES = []
+for robot_type in available_robots:
+    TEST_ROBOT_TYPES += [(robot_type, True), (robot_type, False)]
+
+TEST_CAMERA_TYPES = []
+for camera_type in available_cameras:
+    TEST_CAMERA_TYPES += [(camera_type, True), (camera_type, False)]
+
+TEST_MOTOR_TYPES = []
+for motor_type in available_motors:
+    TEST_MOTOR_TYPES += [(motor_type, True), (motor_type, False)]
+
+# Camera indices used for connecting physical cameras
+OPENCV_CAMERA_INDEX = int(os.environ.get("LEROBOT_TEST_OPENCV_CAMERA_INDEX", 0))
+INTELREALSENSE_CAMERA_INDEX = int(os.environ.get("LEROBOT_TEST_INTELREALSENSE_CAMERA_INDEX", 128422271614))
+
+DYNAMIXEL_PORT = os.environ.get("LEROBOT_TEST_DYNAMIXEL_PORT", "/dev/tty.usbmodem575E0032081")
+DYNAMIXEL_MOTORS = {
+    "shoulder_pan": [1, "xl430-w250"],
+    "shoulder_lift": [2, "xl430-w250"],
+    "elbow_flex": [3, "xl330-m288"],
+    "wrist_flex": [4, "xl330-m288"],
+    "wrist_roll": [5, "xl330-m288"],
+    "gripper": [6, "xl330-m288"],
+}
+
+FEETECH_PORT = os.environ.get("LEROBOT_TEST_FEETECH_PORT", "/dev/tty.usbmodem585A0080971")
+FEETECH_MOTORS = {
+    "shoulder_pan": [1, "sts3215"],
+    "shoulder_lift": [2, "sts3215"],
+    "elbow_flex": [3, "sts3215"],
+    "wrist_flex": [4, "sts3215"],
+    "wrist_roll": [5, "sts3215"],
+    "gripper": [6, "sts3215"],
+}
 
 
 def require_x86_64_kernel(func):
@@ -173,13 +211,19 @@ def require_robot(func):
         # Access the pytest request context to get the is_robot_available fixture
         request = kwargs.get("request")
         robot_type = kwargs.get("robot_type")
+        mock = kwargs.get("mock")
 
+        if robot_type is None:
+            raise ValueError("The 'robot_type' must be an argument of the test function.")
         if request is None:
-            raise ValueError("The 'request' fixture must be passed to the test function as a parameter.")
+            raise ValueError("The 'request' fixture must be an argument of the test function.")
+        if mock is None:
+            raise ValueError("The 'mock' variable must be an argument of the test function.")
 
-        # The function `is_robot_available` is defined in `tests/conftest.py`
-        if not request.getfixturevalue("is_robot_available"):
+        # Run test with a real robot. Skip test if robot connection fails.
+        if not mock and not request.getfixturevalue("is_robot_available"):
             pytest.skip(f"A {robot_type} robot is not available.")
+
         return func(*args, **kwargs)
 
     return wrapper
