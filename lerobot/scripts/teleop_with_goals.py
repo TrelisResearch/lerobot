@@ -87,8 +87,18 @@ if __name__ == "__main__":
     prior_relative_action = np.zeros(6)
     while True:
         start = time.perf_counter()
-        # Fow now let's assume that they all have the same timestamp.
         obs_dict, action_dict = robot.teleop_step(record_data=True)
+        
+        # Get the relative action from the action dictionary and convert to numpy
+        relative_action = action_dict["action"].numpy()
+        
+        # Use the correct image key
+        if "observation.images.laptop" in obs_dict:
+            img = obs_dict["observation.images.laptop"].numpy()
+        else:
+            logging.error("Could not find laptop camera image in observation dictionary")
+            break
+
         if tdmpc is not None:
             V = compute_state_value(tdmpc, obs_dict)
             action_traj = (
@@ -96,14 +106,10 @@ if __name__ == "__main__":
             )
         else:
             V = 0
-        action = action_dict["action"].numpy()
-        relative_action = (action_dict["action"] - obs_dict["observation.state"]).numpy()
-        maximum_relative_action = np.maximum(np.abs(relative_action), maximum_relative_action)
-        print(maximum_relative_action)
-        img = obs_dict["observation.images.main"].numpy()
-        annotated_img = img.copy()
+
+        # Now we can use relative_action in the reward calculation
         reward, _, _, info = calc_reward_cube_push(
-            img=obs_dict["observation.images.main"].numpy(),
+            img=obs_dict["observation.images.laptop"].numpy(),
             goal_mask=goal_mask,
             current_joint_pos=obs_dict["observation.state"].numpy(),
             action=relative_action,
@@ -151,7 +157,7 @@ if __name__ == "__main__":
         else:
             busy_wait((1 / args.fps) - elapsed)
 
-        prior_relative_action = relative_action.copy()
+        prior_relative_action = relative_action.copy()  # Now this will work since it's numpy
         step += 1
 
     cv2.destroyAllWindows()

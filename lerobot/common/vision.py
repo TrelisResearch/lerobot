@@ -10,13 +10,18 @@ def segment_hsv(img) -> tuple[np.ndarray, np.ndarray]:
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
     # Segment with HSV bounds.
+    # Red color #da2e35 in HSV space
+    # Note: OpenCV H range is 0-180 (not 0-360), S and V are 0-255
     mask = (
         (
-            (hsv[..., 0] >= 195 / 2)
-            & (hsv[..., 0] <= 260 / 2)
-            & (hsv[..., 1] >= 240)
-            & (hsv[..., 2] >= 100)
-            & (hsv[..., 2] <= 240)
+            # Red can wrap around the hue circle, so we need two ranges
+            (
+                ((hsv[..., 0] >= 0) & (hsv[..., 0] <= 10)) |  # Lower red range
+                ((hsv[..., 0] >= 170) & (hsv[..., 0] <= 180))  # Upper red range
+            )
+            & (hsv[..., 1] >= 150)  # Minimum saturation
+            & (hsv[..., 2] >= 150)  # Minimum value
+            & (hsv[..., 2] <= 255)  # Maximum value
         )
         * 255
     ).astype(np.uint8)

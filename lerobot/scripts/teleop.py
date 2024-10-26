@@ -31,18 +31,36 @@ while True:
     print(follower_pos)
     # print(follower_pos)
     if "camera" in args.visualize:
-        cv2.imshow(
-            "window",
-            cv2.resize(
-                cv2.cvtColor(obs_dict["observation.images.main"].numpy(), cv2.COLOR_RGB2BGR),
-                (0, 0),
-                fx=8,
-                fy=8,
-            ),
-        )
-        k = cv2.waitKey(1)
-        if k == ord("q"):
-            break
+        # Try different possible keys for camera images
+        camera_image = None
+        possible_keys = [
+            "observation.images.main",
+            "observation.images.laptop",  # Based on your config file
+            "images.laptop",
+            "laptop"
+        ]
+        
+        for key in possible_keys:
+            if key in obs_dict:
+                camera_image = obs_dict[key]
+                break
+        
+        if camera_image is not None:
+            cv2.imshow(
+                "window",
+                cv2.resize(
+                    cv2.cvtColor(camera_image.numpy(), cv2.COLOR_RGB2BGR),
+                    (0, 0),
+                    fx=8,
+                    fy=8,
+                ),
+            )
+            k = cv2.waitKey(1)
+            if k == ord("q"):
+                break
+        else:
+            logging.warning("No camera image found in observation dictionary")
+            print("Available keys:", obs_dict.keys())
     if "twin" in args.visualize:
         digital_twin.set_twin_pose(follower_pos)
         if digital_twin.quit_signal_is_set():

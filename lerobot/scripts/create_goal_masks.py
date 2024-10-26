@@ -14,6 +14,7 @@ How to use:
 """
 
 from pathlib import Path
+import cv2
 
 from hydra.utils import instantiate
 
@@ -30,7 +31,12 @@ for position in ["left", "right", "center"]:
     print(f"Draw goal region for {position}")
     save_goal_mask_path = Path(f"outputs/goal_mask_{position}.npy")
     goal_setter = GoalSetter()
-    img = camera.async_read()
+    for _ in range(10):
+        img = camera.async_read()
     goal_setter.set_image(img, resize_factor=8)
     goal_setter.run()
     goal_setter.save_goal_mask(save_goal_mask_path)
+
+# Add these lines to clean up
+cv2.destroyAllWindows()
+camera.disconnect()
