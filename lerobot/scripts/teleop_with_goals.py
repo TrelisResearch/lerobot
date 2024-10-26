@@ -84,14 +84,16 @@ if __name__ == "__main__":
     # Test it out
     step = 0
     maximum_relative_action = np.zeros(6)
+
     prior_relative_action = np.zeros(6)
     while True:
         start = time.perf_counter()
         obs_dict, action_dict = robot.teleop_step(record_data=True)
         
         # Get the relative action from the action dictionary and convert to numpy
-        relative_action = action_dict["action"].numpy()
-        
+        relative_action = (action_dict["action"] - obs_dict["observation.state"]).numpy()
+        maximum_relative_action = np.maximum(np.abs(maximum_relative_action), np.abs(relative_action))
+        print(f"Max actions: {maximum_relative_action}")
         # Use the correct image key
         if "observation.images.laptop" in obs_dict:
             img = obs_dict["observation.images.laptop"].numpy()
