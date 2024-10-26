@@ -74,14 +74,14 @@ def se3_error(target_pose, current_pose):
 
 class RobotKinematics:
     # Measurements for the Koch robot.
-    measurements = {
-        "gripper": [0.239, -0.001, 0.024],
-        "wrist": [0.209, 0, 0.024],
-        "forearm": [0.108, 0, 0.02],
-        "humerus": [0, 0, 0.036],
-        "shoulder": [0, 0, 0],
-        "base": [0, 0, 0.02],
-    }
+    # measurements = {
+    #     "gripper": [0.239, -0.001, 0.024],
+    #     "wrist": [0.209, 0, 0.024],
+    #     "forearm": [0.108, 0, 0.02],
+    #     "humerus": [0, 0, 0.036],
+    #     "shoulder": [0, 0, 0],
+    #     "base": [0, 0, 0.02],
+    # }
 
     # Measurements for the SO-100 robot.
     # measurements = {
@@ -94,14 +94,14 @@ class RobotKinematics:
     # }
 
     # Measurements for the Moss V1.0
-    # measurements = {
-    #     "gripper": [0.292, 0.022, 0.064],
-    #     "wrist": [0.245, 0.002, 0.064],
-    #     "forearm": [0.122, 0, 0.064],
-    #     "humerus": [0.001, 0.001, 0.063],
-    #     "shoulder": [0, 0, 0],
-    #     "base": [0, 0, 0.02],  # ?
-    # }
+    measurements = {
+        "gripper": [0.246, 0.013, 0.111],
+        "wrist": [0.245, 0.002, 0.064],
+        "forearm": [0.122, 0, 0.064],
+        "humerus": [0.001, 0.001, 0.063],
+        "shoulder": [0, 0, 0],
+        "base": [0, 0, 0.02],  # ?
+    }
 
     gripper_X0 = np.array(
         [
@@ -116,7 +116,7 @@ class RobotKinematics:
     # Gripper origin to centroid transform.
     X_GoGc = np.array(
         [
-            [1, 0, 0, 0.048],
+            [1, 0, 0, 0.07],
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1],
@@ -125,7 +125,7 @@ class RobotKinematics:
     # Gripper origin to tip transform.
     X_GoGt = np.array(
         [
-            [1, 0, 0, 0.083],
+            [1, 0, 0, 0.12],
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1],

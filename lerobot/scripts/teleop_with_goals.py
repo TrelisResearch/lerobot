@@ -72,7 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("--fps", type=float, default=30.0)
     args = parser.parse_args()
 
-    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/koch_.yaml"))
+    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/moss.yaml"))
     robot.connect()
 
     tdmpc = None  # Set this up if you want to see the predicted value function

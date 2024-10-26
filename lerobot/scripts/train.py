@@ -406,7 +406,7 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
     logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
     logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
-    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/koch_.yaml"))
+    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/moss.yaml"))
     robot.connect()
 
     # Note: this helper will be used in offline and online training loops.

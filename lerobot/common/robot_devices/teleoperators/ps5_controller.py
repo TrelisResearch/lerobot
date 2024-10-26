@@ -94,8 +94,8 @@ class PS5Controller:
             desired_ee_pose = (
                 np.array(
                     [
-                        [1, 0, 0, -left_right * EE_SENSITIVITY],
-                        [0, 1, 0, forward_backward * EE_SENSITIVITY],
+                        [1, 0, 0, -forward_backward * EE_SENSITIVITY],
+                        [0, 1, 0, -left_right * EE_SENSITIVITY],
                         [0, 0, 1, (up - down) * EE_SENSITIVITY / 4],
                         [0, 0, 0, 1],
                     ]
@@ -121,8 +121,6 @@ class PS5Controller:
 
         if gamepad_last_state[7]:
             target_joint_state[5] += 3
-
-        print(target_joint_state)
 
         return target_joint_state
 

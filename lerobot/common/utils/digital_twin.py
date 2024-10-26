@@ -28,7 +28,7 @@ class DigitalTwin:
         self.gripper = o3d.geometry.OrientedBoundingBox(
             center=[0, 0, 0],
             R=np.eye(3),
-            extent=[0.083, 0.036, 0.035],  # (0.083, 0.035, 0.036)
+            extent=[0.10, 0.065, 0.045],  # (0.083, 0.035, 0.036)
         )
         # self.gripper.compute_vertex_normals()
         # self.gripper.paint_uniform_color(GREEN)

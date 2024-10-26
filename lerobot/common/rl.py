@@ -19,8 +19,8 @@ from lerobot.common.vision import segment_hsv
 # and there is a negative reward. You might need to tweak these for your setup. Use `teleop_with_goals.py` to
 # check rewards.
 GRIPPER_TIP_Z_BOUNDS = (0.008, 0.065)
-GRIPPER_TIP_X_BOUNDS = (-0.16, 0.16)
-GRIPPER_TIP_Y_BOUNDS = (-0.25, -0.06)
+GRIPPER_TIP_X_BOUNDS = (0.10, 0.30)
+GRIPPER_TIP_Y_BOUNDS = (-0.2, 0.2)
 GRIPPER_TIP_BOUNDS = np.row_stack([GRIPPER_TIP_X_BOUNDS, GRIPPER_TIP_Y_BOUNDS, GRIPPER_TIP_Z_BOUNDS])
 
 
@@ -119,6 +119,7 @@ def calc_reward_cube_push(
 
     # Check if the gripper went OOB.
     gripper_tip_pos = RobotKinematics.fk_gripper_tip(current_joint_pos)[:3, -1]
+
     if not is_in_bounds(gripper_tip_pos):
         do_terminate = True
         reward += oob_reward
@@ -226,15 +227,21 @@ def reset_for_cube_push(robot: ManipulatorRobot, right=True):
     You can run `python lerobot/common/rl` to test the rest. Check the code in `if __name__ == "__main__":`.
     """
     robot.follower_arms["main"].write("Torque_Enable", TorqueMode.ENABLED.value)
-    staging_pos = torch.tensor([90, 100, 60, 65, 3, 30]).float()
+    staging_pos = torch.tensor([0.21972656, 82.74902, 56.601562, 68.115234, 1.5820312, 1.3097577]).float()
     while True:
         reset_pos = torch.tensor(
             [
-                np.random.uniform(125, 135) if right else np.random.uniform(45, 55),
-                np.random.uniform(54, 58),
-                np.random.uniform(50, 52),
-                np.random.uniform(78, 98),
-                np.random.uniform(-41, -31) if right else np.random.uniform(31, 41),
+                # np.random.uniform(125, 135) if right else np.random.uniform(45, 55),
+                np.random.uniform(34, 36) if right else np.random.uniform(-32, -22),
+                # np.random.uniform(54, 58),
+                np.random.uniform(63, 65),
+                # np.random.uniform(50, 52),
+                np.random.uniform(73, 77),
+                # np.random.uniform(78, 98),
+                np.random.uniform(53, 73),
+                # np.random.uniform(-41, -31) if right else np.random.uniform(31, 41),
+                np.random.uniform(-36, -26) if right else np.random.uniform(10, 20),
+                # np.random.uniform(0, 20),
                 np.random.uniform(0, 20),
             ]
         ).float()
@@ -245,24 +252,24 @@ def reset_for_cube_push(robot: ManipulatorRobot, right=True):
             break
     intermediate_pos = torch.from_numpy(robot.follower_arms["main"].read("Present_Position"))
     intermediate_pos[1] = staging_pos[1]
-    _go_to_pos(robot, intermediate_pos, tol=np.array([5, 5, 5, 10, 5, 5]))
+    _go_to_pos(robot, intermediate_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
     intermediate_pos[1:] = staging_pos[1:]
-    _go_to_pos(robot, intermediate_pos, tol=np.array([5, 5, 5, 10, 5, 5]))
+    _go_to_pos(robot, intermediate_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
     if right and staging_pos[0] > intermediate_pos[0]:  # noqa: SIM114
-        _go_to_pos(robot, staging_pos, tol=np.array([5, 5, 5, 10, 5, 5]))
+        _go_to_pos(robot, staging_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
     elif (not right) and staging_pos[0] < intermediate_pos[0]:
-        _go_to_pos(robot, staging_pos, tol=np.array([5, 5, 5, 10, 5, 5]))
+        _go_to_pos(robot, staging_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
     intermediate_pos = staging_pos.clone()
     intermediate_pos[0] = reset_pos[0]
-    _go_to_pos(robot, intermediate_pos, tol=np.array([5, 5, 5, 10, 5, 5]))
-    _go_to_pos(robot, reset_pos)
+    _go_to_pos(robot, intermediate_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
+    _go_to_pos(robot, reset_pos, tol=np.array([3, 7, 3, 3, 3, 3]))
 
 
 if __name__ == "__main__":
     from lerobot.common.robot_devices.robots.factory import make_robot
     from lerobot.common.utils.utils import init_hydra_config
 
-    robot = make_robot(init_hydra_config("lerobot/configs/robot/koch_.yaml"))
+    robot = make_robot(init_hydra_config("lerobot/configs/robot/moss.yaml"))
     robot.connect()
     reset_for_cube_push(robot, right=True)
     reset_for_cube_push(robot, right=False)

@@ -16,7 +16,7 @@ parser.add_argument("-v", "--visualize", nargs="+", choices=["camera", "twin"], 
 args = parser.parse_args()
 
 
-robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/koch_.yaml"))
+robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/moss.yaml"))
 
 robot.connect()
 
@@ -29,8 +29,17 @@ while True:
     obs_dict, _ = robot.teleop_step(record_data=True)
     follower_pos = robot.follower_arms["main"].read("Present_Position")
     print(follower_pos)
+    # print(follower_pos)
     if "camera" in args.visualize:
-        cv2.imshow("window", cv2.cvtColor(obs_dict["observation.images.webcam"].numpy(), cv2.COLOR_RGB2BGR))
+        cv2.imshow(
+            "window",
+            cv2.resize(
+                cv2.cvtColor(obs_dict["observation.images.main"].numpy(), cv2.COLOR_RGB2BGR),
+                (0, 0),
+                fx=8,
+                fy=8,
+            ),
+        )
         k = cv2.waitKey(1)
         if k == ord("q"):
             break
