@@ -508,7 +508,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
         the requested frames. It is only used when `delta_timestamps` is provided. The -1e-4 accounts for
         possible numerical error.
         """
-        return 1 / self._fps - 1e-4
+        return 4 / self._fps - 1e-4
 
     def set_delta_timestamps(self, delta_timestamps: dict[str, list[float]] | None):
         """Set delta_timestamps converting the values to numpy arrays.
@@ -810,7 +810,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
                     / self.VIDEOS_DIR
                     / self.VIDEO_NAME_FSTRING.format(data_key=k, episode_index=episode_index),
                     timestamps=self._data[self.TIMESTAMP_KEY][data_mask],
-                    tolerance_s=1 / self.fps / 2,
+                    tolerance_s=5 * 1 / self.fps,  # allow two full periods of error
                     backend="pyav",
                     to_pytorch_format=False,
                 )
@@ -950,7 +950,7 @@ class LeRobotDatasetV2(torch.utils.data.Dataset):
                     / self.VIDEOS_DIR
                     / self.VIDEO_NAME_FSTRING.format(data_key=k, episode_index=item[self.EPISODE_INDEX_KEY]),
                     timestamps=[item[self.TIMESTAMP_KEY]],
-                    tolerance_s=1 / self.fps / 2,  # allow half a period of error
+                    tolerance_s=1 / self.fps,  # Allow one frame of error.
                     backend="pyav",
                     to_pytorch_format=True,
                 )[0]

@@ -213,7 +213,8 @@ def rollout(
         start_step_time = to_relative_time(time.perf_counter())
         is_warmup = start_step_time <= warmup_s
         observation: dict[str, torch.Tensor] = robot.capture_observation()
-        print(f"Observation keys: {observation.keys()}")  # Print available keys instead
+        # print(f"Observation keys: {list(observation.keys())}")
+
         annotated_img = None
 
         # Update the episode data for this frame with indices, the observation, and the reward.
@@ -397,6 +398,10 @@ def rollout(
                 episode_data["action"].append(relative_action.numpy())
             else:
                 episode_data["action"].append(absolute_action.numpy())
+                
+            # Add debug print to see actions being logged
+            print(f"Action logged: {episode_data['action'][-1]}")  # Show the most recent action
+            print(f"Total actions recorded: {len(episode_data['action'])}")
 
         # Track the prior absolute action for calculating the reward.
         prior_absolute_action = absolute_action.clone()
@@ -650,3 +655,4 @@ if __name__ == "__main__":
             # Disconnect manually to avoid a "Core dump" during process
             # termination due to camera threads not properly exiting.
             robot.disconnect()
+
