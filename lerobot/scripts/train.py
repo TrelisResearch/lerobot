@@ -323,7 +323,7 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
     set_global_seed(cfg.seed)
 
     # Check device is available
-    device = get_safe_torch_device(cfg.device, log=True)
+    device = get_safe_torch_device(cfg.device)
 
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
@@ -743,3 +743,4 @@ def train_notebook(out_dir=None, job_name=None, config_name="default", config_pa
 
 if __name__ == "__main__":
     train_cli()
+

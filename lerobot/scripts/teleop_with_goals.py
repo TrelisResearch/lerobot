@@ -93,7 +93,7 @@ if __name__ == "__main__":
         # Get the relative action from the action dictionary and convert to numpy
         relative_action = (action_dict["action"] - obs_dict["observation.state"]).numpy()
         maximum_relative_action = np.maximum(np.abs(maximum_relative_action), np.abs(relative_action))
-        print(f"Max actions: {maximum_relative_action}")
+        # print(f"Max actions: {maximum_relative_action}")
         # Use the correct image key
         if "observation.images.main" in obs_dict:  # Changed from 'laptop' to 'main'
             img = obs_dict["observation.images.main"].numpy()  # Changed from 'laptop' to 'main'

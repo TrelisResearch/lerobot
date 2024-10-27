@@ -18,10 +18,11 @@ from lerobot.common.vision import segment_hsv
 # These are for the boundaries of the workspace. If the robot goes out of bounds, the episode is terminated
 # and there is a negative reward. You might need to tweak these for your setup. Use `teleop_with_goals.py` to
 # check rewards.
-GRIPPER_TIP_Z_BOUNDS = (0.008, 0.065)
+GRIPPER_TIP_Z_BOUNDS = (0.02, 0.065)
 GRIPPER_TIP_X_BOUNDS = (0.10, 0.30)
 GRIPPER_TIP_Y_BOUNDS = (-0.2, 0.2)
 GRIPPER_TIP_BOUNDS = np.row_stack([GRIPPER_TIP_X_BOUNDS, GRIPPER_TIP_Y_BOUNDS, GRIPPER_TIP_Z_BOUNDS])
+calibrate_pos = True  # Set to True for calibration purposes
 
 
 def is_in_bounds(gripper_tip_pos, buffer: float | np.ndarray = 0):
@@ -30,6 +31,8 @@ def is_in_bounds(gripper_tip_pos, buffer: float | np.ndarray = 0):
     for i, bounds in enumerate(GRIPPER_TIP_BOUNDS):
         assert (bounds[1] - bounds[0]) > buffer[i].sum()
         if gripper_tip_pos[i] < bounds[0] + buffer[i][0] or gripper_tip_pos[i] > bounds[1] - buffer[i][1]:
+            if calibrate_pos:
+                print(f"Position {i} is out of bounds: {gripper_tip_pos[i]}")
             return False
     return True
 

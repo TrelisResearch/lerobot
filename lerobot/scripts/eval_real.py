@@ -213,6 +213,7 @@ def rollout(
         start_step_time = to_relative_time(time.perf_counter())
         is_warmup = start_step_time <= warmup_s
         observation: dict[str, torch.Tensor] = robot.capture_observation()
+        print(f"Observation keys: {observation.keys()}")  # Print available keys instead
         annotated_img = None
 
         # Update the episode data for this frame with indices, the observation, and the reward.
