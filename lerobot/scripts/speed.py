@@ -12,7 +12,7 @@ if __name__ == "__main__":
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     
     policy = make_policy(
-        init_hydra_config("lerobot/configs/default.yaml", overrides=["policy=tdmpc_real", "env=koch_real"]),
+        init_hydra_config("lerobot/configs/default.yaml", overrides=["policy=tdmpc_real", "env=koch_real", "+horizon=10"]),
         dataset_stats={
             "observation.images.main": {"mean": torch.tensor(0), "std": torch.tensor(1)},
             "observation.state": {"min": torch.tensor(0), "max": torch.tensor(1)},
