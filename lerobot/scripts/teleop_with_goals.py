@@ -95,10 +95,10 @@ if __name__ == "__main__":
         maximum_relative_action = np.maximum(np.abs(maximum_relative_action), np.abs(relative_action))
         print(f"Max actions: {maximum_relative_action}")
         # Use the correct image key
-        if "observation.images.laptop" in obs_dict:
-            img = obs_dict["observation.images.laptop"].numpy()
+        if "observation.images.main" in obs_dict:  # Changed from 'laptop' to 'main'
+            img = obs_dict["observation.images.main"].numpy()  # Changed from 'laptop' to 'main'
         else:
-            logging.error("Could not find laptop camera image in observation dictionary")
+            logging.error("Could not find main camera image in observation dictionary")  # Updated error message
             break
 
         if tdmpc is not None:
@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
         # Now we can use relative_action in the reward calculation
         reward, _, _, info = calc_reward_cube_push(
-            img=obs_dict["observation.images.laptop"].numpy(),
+            img=obs_dict["observation.images.main"].numpy(),  # Changed from 'laptop' to 'main'
             goal_mask=goal_mask,
             current_joint_pos=obs_dict["observation.state"].numpy(),
             action=relative_action,

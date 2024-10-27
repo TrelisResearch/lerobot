@@ -224,8 +224,10 @@ class TDMPCPolicy(
             (horizon, batch, action_dim,) tensor for the planned trajectory of actions.
         """
         device = get_device_from_parameters(self)
+        print("Starting plan method")
 
         batch_size = z.shape[0]
+        print(f"Batch size: {batch_size}")
 
         # Sample Nπ trajectories from the policy.
         pi_actions = torch.empty(
@@ -235,6 +237,8 @@ class TDMPCPolicy(
             self.config.output_shapes["action"][0],
             device=device,
         )
+        print("Created pi_actions tensor")
+
         if self.config.n_pi_samples > 0:
             _z = einops.repeat(z, "b d -> n b d", n=self.config.n_pi_samples)
             for t in range(self.config.horizon):
@@ -242,10 +246,12 @@ class TDMPCPolicy(
                 # helpful for CEM.
                 pi_actions[t] = self.model.pi(_z, self.config.min_std)
                 _z = self.model.latent_dynamics(_z, pi_actions[t])
+            print("Completed pi_actions sampling")
 
         # In the CEM loop we will need this for a call to estimate_value with the gaussian sampled
         # trajectories.
         z = einops.repeat(z, "b d -> n b d", n=self.config.n_gaussian_samples + self.config.n_pi_samples)
+        print("Repeated z tensor")
 
         # Model Predictive Path Integral (MPPI) with the cross-entropy method (CEM) as the optimization
         # algorithm.
@@ -257,8 +263,10 @@ class TDMPCPolicy(
         if self._prev_mean is not None:
             mean[:-1] = self._prev_mean[1:]
         std = self.config.max_std * torch.ones_like(mean)
+        print("Created mean and std tensors")
 
-        for _ in range(self.config.cem_iterations):
+        for i in range(self.config.cem_iterations):
+            print(f"CEM iteration {i}")
             # Randomly sample action trajectories for the gaussian distribution.
             std_normal_noise = torch.randn(
                 self.config.horizon,
@@ -268,19 +276,30 @@ class TDMPCPolicy(
                 device=std.device,
             )
             gaussian_actions = torch.clamp(mean.unsqueeze(1) + std.unsqueeze(1) * std_normal_noise, -1, 1)
+            print("Generated gaussian actions")
 
             # Compute elite actions.
             actions = torch.cat([gaussian_actions, pi_actions], dim=1)
+            print(f"Actions shape: {actions.shape}")
             value = self.estimate_value(z, actions).nan_to_num_(0)
+            print(f"Value shape: {value.shape}")
+            
+            # Modified version to avoid take_along_dim
             elite_idxs = torch.topk(value, self.config.n_elites, dim=0).indices  # (n_elites, batch)
-            elite_value = value.take_along_dim(elite_idxs, dim=0)  # (n_elites, batch)
-            # (horizon, n_elites, batch, action_dim)
-            elite_actions = actions.take_along_dim(einops.rearrange(elite_idxs, "n b -> 1 n b 1"), dim=1)
+            print(f"Elite indices shape: {elite_idxs.shape}")
+            
+            # Modified gather operation
+            elite_value = value[elite_idxs.squeeze(-1)]  # Try direct indexing instead of gather
+            print(f"Elite value shape: {elite_value.shape}")
+            
+            # Reshape indices for gathering actions
+            gather_indices = elite_idxs.unsqueeze(0).unsqueeze(-1).expand(actions.shape[0], -1, -1, actions.shape[-1])
+            elite_actions = actions[:, elite_idxs.squeeze(-1)]  # Try direct indexing here too
 
             # Update gaussian PDF parameters to be the (weighted) mean and standard deviation of the elites.
             max_value = elite_value.max(0, keepdim=True)[0]  # (1, batch)
             # The weighting is a softmax over trajectory values. Note that this is not the same as the usage
-            # of Ω in eqn 4 of the TD-MPC paper. Instead it is the normalized version of it: s = Ω/ΣΩ. This
+            # of Ω in eqn 4 of the TD-MPC paper. Instead it is the normalized version of it: s = Ω/ΣΩ. This
             # makes the equations: μ = Σ(s⋅Γ), σ = Σ(s⋅(Γ-μ)²).
             score = torch.exp(self.config.elite_weighting_temperature * (elite_value - max_value))
             score /= score.sum(axis=0, keepdim=True)
@@ -878,3 +897,5 @@ def flatten_forward_unflatten(fn: Callable[[Tensor], Tensor], image_tensor: Tens
     inp = torch.flatten(image_tensor, end_dim=-4)
     flat_out = fn(inp)
     return torch.reshape(flat_out, (*start_dims, *flat_out.shape[1:]))
+
+
